@@ -708,37 +708,77 @@
         (function() {
             'use strict';
 
-// ===== КОНФИГ =====
-const GRID_SIZE = 1000;
-const BLOCK_SIZE = 10;
-const BLOCK_PIXELS = BLOCK_SIZE * BLOCK_SIZE;
-const PRICE_PER_PIXEL = 1;
-const BLOCKS_PER_ROW = GRID_SIZE / BLOCK_SIZE;
-const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛЕНО
+            console.log('🚀 Запуск Pixel Map...');
+            console.log('📍 Версия: серверная синхронизация');
 
-
-            // ===== АДРЕС СЕРВЕРА НА RENDER =====
+            // ===== КОНФИГ =====
+            const GRID_SIZE = 1000;
+            const BLOCK_SIZE = 10;
+            const BLOCK_PIXELS = BLOCK_SIZE * BLOCK_SIZE;
+            const PRICE_PER_PIXEL = 1;
+            const BLOCKS_PER_ROW = GRID_SIZE / BLOCK_SIZE;
+            
+            // ===== АДРЕС СЕРВЕРА =====
             const API_URL = 'https://pixel-map-server-lbfs.onrender.com';
-
+            console.log('🌐 Сервер:', API_URL);
+            
             // ===== СОСТОЯНИЕ =====
             let soldData = {};
             let selectedBlocks = new Set();
             let currentTransactionId = null;
             let transactionCheckInterval = null;
+            let isProcessing = false;
 
-            // ===== ЗАГРУЗКА / СОХРАНЕНИЕ =====
+            console.log('✅ Конфигурация загружена');
+
+            // ===== ЗАГРУЗКА С СЕРВЕРА =====
+            async function loadPixelsFromServer() {
+                console.log('📡 Загрузка данных с сервера...');
+                try {
+                    const response = await fetch(`${API_URL}/api/pixels`);
+                    if (!response.ok) throw new Error('Ошибка загрузки данных');
+                    const data = await response.json();
+                    soldData = data.sold || {};
+                    console.log('✅ Данные загружены, блоков:', Object.keys(soldData).length);
+                    
+                    // Сохраняем в localStorage как кеш
+                    try {
+                        localStorage.setItem('pixelGridData', JSON.stringify(soldData));
+                    } catch (e) {}
+                    
+                    loadBlockImages();
+                    render();
+                    console.log('✅ Данные синхронизированы с сервером');
+                } catch (error) {
+                    console.error('❌ Ошибка загрузки с сервера:', error);
+                    // Используем локальные данные как резерв
+                    loadData();
+                    render();
+                }
+            }
+
+            // ===== ЗАГРУЗКА / СОХРАНЕНИЕ (локальный резерв) =====
             function loadData() {
+                console.log('📂 Загрузка из localStorage...');
                 try {
                     const saved = localStorage.getItem('pixelGridData');
                     if (saved) {
                         try {
                             soldData = JSON.parse(saved);
+                            console.log('✅ Загружено из localStorage, блоков:', Object.keys(soldData).length);
                         } catch (e) {
                             soldData = {};
+                            console.warn('⚠️ Ошибка парсинга localStorage');
                         }
                         if (typeof soldData !== 'object' || Array.isArray(soldData)) soldData = {};
+                    } else {
+                        console.log('📂 Нет данных в localStorage');
+                        soldData = {};
                     }
-                } catch (e) { soldData = {}; }
+                } catch (e) { 
+                    soldData = {};
+                    console.error('❌ Ошибка доступа к localStorage:', e);
+                }
             }
 
             function saveData() {
@@ -748,6 +788,7 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                     if (e.name === 'QuotaExceededError') {
                         alert('⚠️ Хранилище переполнено. Удалите старые блоки.');
                     }
+                    console.error('❌ Ошибка сохранения в localStorage:', e);
                 }
             }
 
@@ -757,10 +798,14 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
 
             function getBlockData(row, col) { return soldData[getBlockId(row, col)] || null; }
 
+            console.log('✅ Функции загрузки готовы');
+
             // ===== CANVAS РЕНДЕРИНГ =====
             const canvas = document.getElementById('pixel-canvas');
             const ctx = canvas.getContext('2d');
             const viewport = document.getElementById('viewport');
+
+            console.log('✅ Canvas найден');
 
             const BLOCK_RENDER_SIZE = 10;
 
@@ -769,13 +814,12 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                 return { width: rect.width, height: rect.height };
             }
 
-            let canvasWidth = 0,
-                canvasHeight = 0;
+            let canvasWidth = 0, canvasHeight = 0;
             let scale = 1;
-            let translateX = 0,
-                translateY = 0;
+            let translateX = 0, translateY = 0;
 
             function resizeCanvas() {
+                console.log('📐 Ресайз Canvas...');
                 const size = getCanvasSize();
                 const dpr = window.devicePixelRatio || 1;
                 canvasWidth = size.width * dpr;
@@ -787,11 +831,17 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                 ctx.scale(dpr, dpr);
                 canvasWidth = size.width;
                 canvasHeight = size.height;
+                console.log('✅ Canvas размер:', canvasWidth, 'x', canvasHeight);
             }
 
             function render() {
                 const w = canvasWidth;
                 const h = canvasHeight;
+
+                if (w === 0 || h === 0) {
+                    console.warn('⚠️ Canvas не инициализирован');
+                    return;
+                }
 
                 ctx.fillStyle = '#08080e';
                 ctx.fillRect(0, 0, w, h);
@@ -867,6 +917,8 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                 let loadedCount = 0;
                 const total = Object.keys(soldData).length;
 
+                console.log('🖼 Загрузка изображений...', total);
+
                 for (const id in soldData) {
                     const data = soldData[id];
                     if (data.image && !data._imgLoaded) {
@@ -898,20 +950,25 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                 const freePixels = total - soldPixels;
                 const earned = soldPixels * PRICE_PER_PIXEL;
 
-                document.getElementById('total-pixels').textContent = total.toLocaleString('ru-RU');
-                document.getElementById('free-pixels').textContent = freePixels.toLocaleString('ru-RU');
-                document.getElementById('sold-pixels').textContent = soldPixels.toLocaleString('ru-RU');
-                document.getElementById('earned').textContent = earned.toLocaleString('ru-RU');
-                document.getElementById('zoom-level').textContent = Math.round(scale * 100) + '%';
+                const totalEl = document.getElementById('total-pixels');
+                const freeEl = document.getElementById('free-pixels');
+                const soldEl = document.getElementById('sold-pixels');
+                const earnedEl = document.getElementById('earned');
+
+                if (totalEl) totalEl.textContent = total.toLocaleString('ru-RU');
+                if (freeEl) freeEl.textContent = freePixels.toLocaleString('ru-RU');
+                if (soldEl) soldEl.textContent = soldPixels.toLocaleString('ru-RU');
+                if (earnedEl) earnedEl.textContent = earned.toLocaleString('ru-RU');
+                
+                const zoomEl = document.getElementById('zoom-level');
+                if (zoomEl) zoomEl.textContent = Math.round(scale * 100) + '%';
             }
 
             // ===== ПАНОРАМИРОВАНИЕ =====
             let isDragging = false;
             let isClick = false;
-            let startX = 0,
-                startY = 0;
-            let startTranslateX = 0,
-                startTranslateY = 0;
+            let startX = 0, startY = 0;
+            let startTranslateX = 0, startTranslateY = 0;
             const DRAG_THRESHOLD = 5;
 
             function updateTransform() {
@@ -919,6 +976,7 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
             }
 
             function centerGrid() {
+                console.log('🎯 Центрирование карты...');
                 const w = canvasWidth;
                 const h = canvasHeight;
                 const gridW = BLOCKS_PER_ROW * BLOCK_RENDER_SIZE;
@@ -929,6 +987,7 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                 translateX = (w - gridW * scale) / 2;
                 translateY = (h - gridH * scale) / 2;
                 updateTransform();
+                console.log('✅ Карта отцентрирована, масштаб:', scale);
             }
 
             viewport.addEventListener('mousedown', function(e) {
@@ -1051,14 +1110,16 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                 const price = pixels * PRICE_PER_PIXEL;
 
                 if (count === 0) {
-                    hint.style.display = 'none';
+                    if (hint) hint.style.display = 'none';
                     return;
                 }
 
-                hint.style.display = 'flex';
-                document.getElementById('selectedCount').textContent = count;
-                document.getElementById('selectedPixelsCount').textContent = pixels.toLocaleString('ru-RU');
-                document.getElementById('selectedPrice').textContent = price.toLocaleString('ru-RU');
+                if (hint) {
+                    hint.style.display = 'flex';
+                    document.getElementById('selectedCount').textContent = count;
+                    document.getElementById('selectedPixelsCount').textContent = pixels.toLocaleString('ru-RU');
+                    document.getElementById('selectedPrice').textContent = price.toLocaleString('ru-RU');
+                }
             }
 
             document.getElementById('clearSelectionBtn').addEventListener('click', clearSelection);
@@ -1073,6 +1134,8 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
 
             function updateMinimap() {
                 const canvas = minimapCanvas;
+                if (!canvas) return;
+                
                 const rect = canvas.parentElement.getBoundingClientRect();
                 const size = Math.min(rect.width, rect.height);
 
@@ -1126,17 +1189,22 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
             const cancelBtn = document.getElementById('cancelBtn');
             const buyBtn = document.getElementById('buyBtn');
 
+            console.log('✅ Элементы модалки найдены');
+
             function updateColorDisplay(hex) {
                 if (!hex.startsWith('#')) hex = '#' + hex;
-                colorSwatch.style.background = hex;
-                colorHexDisplay.textContent = hex.toUpperCase();
+                if (colorSwatch) colorSwatch.style.background = hex;
+                if (colorHexDisplay) colorHexDisplay.textContent = hex.toUpperCase();
             }
 
-            colorInput.addEventListener('input', function() {
-                updateColorDisplay(this.value);
-            });
+            if (colorInput) {
+                colorInput.addEventListener('input', function() {
+                    updateColorDisplay(this.value);
+                });
+            }
 
             function previewImage(src) {
+                if (!imagePreview) return;
                 if (src && src.trim() !== '') {
                     imagePreview.innerHTML = '<img src="' + src + '" alt="Предпросмотр" loading="lazy">';
                 } else {
@@ -1145,131 +1213,155 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
             }
 
             let previewTimeout = null;
-            imageUrlInput.addEventListener('input', function() {
-                clearTimeout(previewTimeout);
-                previewTimeout = setTimeout(function() {
-                    previewImage(imageUrlInput.value);
-                }, 200);
-            });
+            if (imageUrlInput) {
+                imageUrlInput.addEventListener('input', function() {
+                    clearTimeout(previewTimeout);
+                    previewTimeout = setTimeout(function() {
+                        previewImage(imageUrlInput.value);
+                    }, 200);
+                });
+            }
 
-            imageFileInput.addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        const dataUrl = event.target.result;
-                        imageUrlInput.value = dataUrl;
-                        previewImage(dataUrl);
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
+            if (imageFileInput) {
+                imageFileInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            const dataUrl = event.target.result;
+                            if (imageUrlInput) imageUrlInput.value = dataUrl;
+                            previewImage(dataUrl);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
 
             function openBulkEditModal() {
                 const count = selectedBlocks.size;
                 const pixels = count * BLOCK_PIXELS;
                 const price = pixels * PRICE_PER_PIXEL;
 
-                modalTitle.textContent = '🏷️ Купить ' + count + ' блоков';
-                priceAmount.textContent = price.toLocaleString('ru-RU');
+                if (modalTitle) modalTitle.textContent = '🏷️ Купить ' + count + ' блоков';
+                if (priceAmount) priceAmount.textContent = price.toLocaleString('ru-RU');
 
                 const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
-                colorInput.value = randomColor;
-                updateColorDisplay(randomColor);
+                if (colorInput) {
+                    colorInput.value = randomColor;
+                    updateColorDisplay(randomColor);
+                }
 
-                imageUrlInput.value = '';
-                previewImage('');
-                linkInput.value = 'https://example.com';
-                sloganInput.value = 'Блок ' + count + 'шт';
-                buyBtn.textContent = '💰 Купить за ' + price + ' ₽';
-                buyBtn.disabled = true;
-                agreeCheckbox.checked = false;
+                if (imageUrlInput) {
+                    imageUrlInput.value = '';
+                    previewImage('');
+                }
+                if (linkInput) linkInput.value = 'https://example.com';
+                if (sloganInput) sloganInput.value = 'Блок ' + count + 'шт';
+                if (buyBtn) {
+                    buyBtn.textContent = '💰 Купить за ' + price + ' ₽';
+                    buyBtn.disabled = true;
+                }
+                if (agreeCheckbox) agreeCheckbox.checked = false;
 
-                editModal.classList.add('active');
+                if (editModal) editModal.classList.add('active');
             }
 
             function closeEditModal() {
-                editModal.classList.remove('active');
-                imageFileInput.value = '';
+                if (editModal) editModal.classList.remove('active');
+                if (imageFileInput) imageFileInput.value = '';
             }
 
-            agreeCheckbox.addEventListener('change', function() {
-                buyBtn.disabled = !this.checked;
-            });
+            if (agreeCheckbox) {
+                agreeCheckbox.addEventListener('change', function() {
+                    if (buyBtn) buyBtn.disabled = !this.checked;
+                });
+            }
 
-            cancelBtn.addEventListener('click', closeEditModal);
-            editModal.addEventListener('click', function(e) {
-                if (e.target === editModal) closeEditModal();
-            });
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', closeEditModal);
+            }
 
-            // ===== ПОКУПКА С СЕРВЕРОМ =====
-            buyBtn.addEventListener('click', async function() {
-                if (!agreeCheckbox.checked) {
-                    alert('⚠️ Примите условия оферты.');
-                    return;
-                }
+            if (editModal) {
+                editModal.addEventListener('click', function(e) {
+                    if (e.target === editModal) closeEditModal();
+                });
+            }
 
-                const blocks = [...selectedBlocks];
-                if (blocks.length === 0) {
-                    alert('⚠️ Не выбрано ни одного блока.');
-                    return;
-                }
+            // ===== ПОКУПКА ЧЕРЕЗ СЕРВЕР =====
+            if (buyBtn) {
+                buyBtn.addEventListener('click', async function() {
+                    if (isProcessing) return;
+                    
+                    if (!agreeCheckbox || !agreeCheckbox.checked) {
+                        alert('⚠️ Примите условия оферты.');
+                        return;
+                    }
 
-                const color = colorInput.value.trim() || '#2a4a7a';
-                const image = imageUrlInput.value.trim() || '';
-                const link = linkInput.value.trim() || '#';
-                const slogan = sloganInput.value.trim() || 'Без описания';
-                const totalPrice = blocks.length * BLOCK_PIXELS * PRICE_PER_PIXEL;
+                    const blocks = [...selectedBlocks];
+                    if (blocks.length === 0) {
+                        alert('⚠️ Не выбрано ни одного блока.');
+                        return;
+                    }
 
-                buyBtn.disabled = true;
-                buyBtn.textContent = '⏳ Создание платежа...';
+                    const color = colorInput ? colorInput.value.trim() : '#2a4a7a';
+                    const image = imageUrlInput ? imageUrlInput.value.trim() : '';
+                    const link = linkInput ? linkInput.value.trim() : '#';
+                    const slogan = sloganInput ? sloganInput.value.trim() : 'Без описания';
+                    const totalPrice = blocks.length * BLOCK_PIXELS * PRICE_PER_PIXEL;
 
-                try {
-                    const response = await fetch(`${API_URL}/api/create-payment`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            blocks: blocks,
-                            color: color,
-                            image: image,
-                            link: link,
-                            slogan: slogan,
-                            totalPrice: totalPrice
-                        })
-                    });
+                    isProcessing = true;
+                    buyBtn.disabled = true;
+                    buyBtn.textContent = '⏳ Создание платежа...';
 
-                    const data = await response.json();
+                    try {
+                        const response = await fetch(`${API_URL}/api/create-payment`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                blocks: blocks,
+                                color: color,
+                                image: image,
+                                link: link,
+                                slogan: slogan,
+                                totalPrice: totalPrice
+                            })
+                        });
 
-                    if (!data.success) {
-                        alert('❌ ' + (data.error || 'Ошибка при создании платежа'));
+                        const data = await response.json();
+
+                        if (!data.success) {
+                            alert('❌ ' + (data.error || 'Ошибка при создании платежа'));
+                            isProcessing = false;
+                            buyBtn.disabled = false;
+                            buyBtn.textContent = '💰 Купить';
+                            return;
+                        }
+
+                        currentTransactionId = data.transactionId;
+                        closeEditModal();
+
+                        const daWindow = window.open(data.paymentUrl, '_blank', 'width=600,height=700');
+
+                        if (!daWindow) {
+                            alert('⚠️ Разрешите всплывающие окна или откройте ссылку вручную:\n' + data.paymentUrl);
+                            window.location.href = data.paymentUrl;
+                            return;
+                        }
+
+                        startTransactionCheck(data.transactionId);
+                        showNotification('💳 Платёж создан. После оплаты блоки активируются автоматически.', 'info');
+
+                    } catch (error) {
+                        console.error('Payment error:', error);
+                        alert('❌ Ошибка при создании платежа. Попробуйте позже.');
+                        isProcessing = false;
                         buyBtn.disabled = false;
                         buyBtn.textContent = '💰 Купить';
-                        return;
                     }
-
-                    currentTransactionId = data.transactionId;
-                    closeEditModal();
-
-                    const daWindow = window.open(data.paymentUrl, '_blank', 'width=600,height=700');
-
-                    if (!daWindow) {
-                        alert('⚠️ Разрешите всплывающие окна или откройте ссылку вручную:\n' + data.paymentUrl);
-                        window.location.href = data.paymentUrl;
-                        return;
-                    }
-
-                    startTransactionCheck(data.transactionId);
-                    showNotification('💳 Оплата создана. Ожидайте подтверждения...', 'info');
-
-                } catch (error) {
-                    console.error('Payment error:', error);
-                    alert('❌ Ошибка при создании платежа. Попробуйте позже.');
-                    buyBtn.disabled = false;
-                    buyBtn.textContent = '💰 Купить';
-                }
-            });
+                });
+            }
 
             // ===== ПРОВЕРКА ТРАНЗАКЦИИ =====
             function startTransactionCheck(transactionId) {
@@ -1279,7 +1371,7 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                 }
 
                 let attempts = 0;
-                const maxAttempts = 60;
+                const maxAttempts = 120;
 
                 transactionCheckInterval = setInterval(async () => {
                     attempts++;
@@ -1294,27 +1386,38 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                         if (data.status === 'completed') {
                             clearInterval(transactionCheckInterval);
                             transactionCheckInterval = null;
+                            
                             await loadPixelsFromServer();
+                            
                             selectedBlocks.clear();
                             render();
                             showNotification('✅ Оплата успешна! Блоки активированы.', 'success');
                             currentTransactionId = null;
-                            buyBtn.disabled = false;
-                            buyBtn.textContent = '💰 Купить';
+                            isProcessing = false;
+                            if (buyBtn) {
+                                buyBtn.disabled = false;
+                                buyBtn.textContent = '💰 Купить';
+                            }
                         } else if (data.status === 'failed' || data.status === 'cancelled') {
                             clearInterval(transactionCheckInterval);
                             transactionCheckInterval = null;
                             showNotification('❌ Платеж не был завершен. Попробуйте снова.', 'error');
                             currentTransactionId = null;
-                            buyBtn.disabled = false;
-                            buyBtn.textContent = '💰 Купить';
+                            isProcessing = false;
+                            if (buyBtn) {
+                                buyBtn.disabled = false;
+                                buyBtn.textContent = '💰 Купить';
+                            }
                         } else if (attempts >= maxAttempts) {
                             clearInterval(transactionCheckInterval);
                             transactionCheckInterval = null;
                             showNotification('⏰ Время ожидания истекло. Проверьте статус платежа вручную.', 'warning');
                             currentTransactionId = null;
-                            buyBtn.disabled = false;
-                            buyBtn.textContent = '💰 Купить';
+                            isProcessing = false;
+                            if (buyBtn) {
+                                buyBtn.disabled = false;
+                                buyBtn.textContent = '💰 Купить';
+                            }
                         }
                     } catch (error) {
                         console.error('Error checking transaction:', error);
@@ -1322,30 +1425,14 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                             clearInterval(transactionCheckInterval);
                             transactionCheckInterval = null;
                             currentTransactionId = null;
-                            buyBtn.disabled = false;
-                            buyBtn.textContent = '💰 Купить';
+                            isProcessing = false;
+                            if (buyBtn) {
+                                buyBtn.disabled = false;
+                                buyBtn.textContent = '💰 Купить';
+                            }
                         }
                     }
                 }, 3000);
-            }
-
-            // ===== ЗАГРУЗКА С СЕРВЕРА =====
-            async function loadPixelsFromServer() {
-                try {
-                    const response = await fetch(`${API_URL}/api/pixels`);
-                    if (!response.ok) throw new Error('Ошибка загрузки данных');
-                    const data = await response.json();
-                    soldData = data;
-                    try {
-                        localStorage.setItem('pixelGridData', JSON.stringify(soldData));
-                    } catch (e) {}
-                    loadBlockImages();
-                    render();
-                } catch (error) {
-                    console.error('Error loading pixels from server:', error);
-                    loadData();
-                    render();
-                }
             }
 
             // ===== ПРОВЕРКА ВОЗВРАТА =====
@@ -1353,6 +1440,8 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                 const urlParams = new URLSearchParams(window.location.search);
                 const paymentStatus = urlParams.get('payment');
                 const transactionId = urlParams.get('transaction');
+
+                console.log('🔍 Проверка возврата:', paymentStatus, transactionId);
 
                 if (paymentStatus === 'success' && transactionId) {
                     await loadPixelsFromServer();
@@ -1369,6 +1458,8 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
 
             // ===== УВЕДОМЛЕНИЯ =====
             function showNotification(message, type = 'info') {
+                console.log('📢 Уведомление:', message, type);
+                
                 const notification = document.createElement('div');
                 notification.style.cssText = `
                     position: fixed;
@@ -1429,36 +1520,47 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                 const endRow = (row + 1) * 10;
                 const startCol = col * 10 + 1;
                 const endCol = (col + 1) * 10;
-                infoCoords.textContent = '📍 Блок ' + (row + 1) + '×' + (col + 1) +
-                    ' (пиксели ' + startRow + '-' + endRow + ', ' + startCol + '-' + endCol + ')';
-
-                if (data.image) {
-                    infoImage.innerHTML = '<img src="' + data.image + '" alt="Изображение" loading="lazy">';
-                } else {
-                    infoImage.innerHTML = '<span class="no-image">🖼 Нет изображения</span>';
+                if (infoCoords) {
+                    infoCoords.textContent = '📍 Блок ' + (row + 1) + '×' + (col + 1) +
+                        ' (пиксели ' + startRow + '-' + endRow + ', ' + startCol + '-' + endCol + ')';
                 }
 
-                infoSlogan.textContent = data.slogan || 'Без описания';
-
-                if (data.link && data.link !== '#') {
-                    infoLink.href = data.link;
-                    infoLink.style.display = 'inline-block';
-                    infoLink.textContent = '🔗 Перейти на сайт: ' + data.link;
-                } else {
-                    infoLink.style.display = 'none';
+                if (infoImage) {
+                    if (data.image) {
+                        infoImage.innerHTML = '<img src="' + data.image + '" alt="Изображение" loading="lazy">';
+                    } else {
+                        infoImage.innerHTML = '<span class="no-image">🖼 Нет изображения</span>';
+                    }
                 }
 
-                infoModal.classList.add('active');
+                if (infoSlogan) infoSlogan.textContent = data.slogan || 'Без описания';
+
+                if (infoLink) {
+                    if (data.link && data.link !== '#') {
+                        infoLink.href = data.link;
+                        infoLink.style.display = 'inline-block';
+                        infoLink.textContent = '🔗 Перейти на сайт: ' + data.link;
+                    } else {
+                        infoLink.style.display = 'none';
+                    }
+                }
+
+                if (infoModal) infoModal.classList.add('active');
             }
 
             function closeInfoModal() {
-                infoModal.classList.remove('active');
+                if (infoModal) infoModal.classList.remove('active');
             }
 
-            infoCloseBtn.addEventListener('click', closeInfoModal);
-            infoModal.addEventListener('click', function(e) {
-                if (e.target === infoModal) closeInfoModal();
-            });
+            if (infoCloseBtn) {
+                infoCloseBtn.addEventListener('click', closeInfoModal);
+            }
+
+            if (infoModal) {
+                infoModal.addEventListener('click', function(e) {
+                    if (e.target === infoModal) closeInfoModal();
+                });
+            }
 
             // ===== ОФЕРТА =====
             const offerModal = document.getElementById('offerModal');
@@ -1471,26 +1573,42 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
                 offerFullText.innerHTML = offerTextEl.innerHTML;
             }
 
-            offerLink.addEventListener('click', function(e) {
-                e.preventDefault();
-                offerModal.classList.add('active');
-            });
+            if (offerLink) {
+                offerLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (offerModal) offerModal.classList.add('active');
+                });
+            }
 
-            offerCloseBtn.addEventListener('click', function() {
-                offerModal.classList.remove('active');
-            });
-            offerModal.addEventListener('click', function(e) {
-                if (e.target === offerModal) offerModal.classList.remove('active');
-            });
+            if (offerCloseBtn) {
+                offerCloseBtn.addEventListener('click', function() {
+                    if (offerModal) offerModal.classList.remove('active');
+                });
+            }
+
+            if (offerModal) {
+                offerModal.addEventListener('click', function(e) {
+                    if (e.target === offerModal) offerModal.classList.remove('active');
+                });
+            }
 
             // ===== DONATIONALERTS =====
-            document.getElementById('donationLink').addEventListener('click', function(e) {
-                e.preventDefault();
-                window.open(DA_URL, '_blank');
-            });
-            document.getElementById('donationAlertBtn').addEventListener('click', function() {
-                window.open(DA_URL, '_blank');
-            });
+            const donationLink = document.getElementById('donationLink');
+            const donationAlertBtn = document.getElementById('donationAlertBtn');
+            const DA_URL = 'https://www.donationalerts.com/r/rvdqs';
+
+            if (donationLink) {
+                donationLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    window.open(DA_URL, '_blank');
+                });
+            }
+
+            if (donationAlertBtn) {
+                donationAlertBtn.addEventListener('click', function() {
+                    window.open(DA_URL, '_blank');
+                });
+            }
 
             // ===== РЕСАЙЗ =====
             let resizeTimer;
@@ -1504,29 +1622,45 @@ const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛ�
 
             // ===== ЗАПУСК =====
             async function init() {
-                loadData();
-                resizeCanvas();
-                await loadPixelsFromServer();
-                setTimeout(centerGrid, 50);
-                loadBlockImages();
-                await checkPaymentReturn();
+                console.log('🚀 Инициализация...');
+                
+                try {
+                    console.log('📐 Ресайз Canvas...');
+                    resizeCanvas();
+                    
+                    console.log('📡 Загрузка данных с сервера...');
+                    await loadPixelsFromServer();
+                    
+                    console.log('🎯 Центрирование...');
+                    setTimeout(centerGrid, 50);
+                    
+                    console.log('🖼 Загрузка изображений...');
+                    loadBlockImages();
+                    
+                    console.log('🔍 Проверка возврата...');
+                    await checkPaymentReturn();
 
-                const urlParams = new URLSearchParams(window.location.search);
-                const transactionId = urlParams.get('transaction');
-                if (transactionId) {
-                    startTransactionCheck(transactionId);
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const transactionId = urlParams.get('transaction');
+                    if (transactionId) {
+                        console.log('🔄 Активная транзакция:', transactionId);
+                        startTransactionCheck(transactionId);
+                    }
+
+                    console.log('✅ Pixel Map успешно загружен!');
+                    console.log('🌐 Сервер:', API_URL);
+                    console.log('📊 Продано блоков:', Object.keys(soldData).length);
+                } catch (error) {
+                    console.error('❌ Ошибка инициализации:', error);
                 }
             }
 
+            // Запуск
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', init);
             } else {
                 init();
             }
-
-            console.log('⚡ Pixel Map с серверной оплатой');
-            console.log('🌐 Сервер:', API_URL);
-            console.log('📊 Продано блоков:', Object.keys(soldData).length);
 
         })();
     </script>
