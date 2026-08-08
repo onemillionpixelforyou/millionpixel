@@ -708,13 +708,14 @@
         (function() {
             'use strict';
 
-            // ===== КОНФИГ =====
-            const GRID_SIZE = 1000;
-            const BLOCK_SIZE = 10;
-            const BLOCK_PIXELS = BLOCK_SIZE * BLOCK_SIZE;
-            const PRICE_PER_PIXEL = 1;
-            const BLOCKS_PER_ROW = GRID_SIZE / BLOCK_SIZE;
-            const DA_URL = 'https://www.donationalerts.com/r/rvdqs';
+// ===== КОНФИГ =====
+const GRID_SIZE = 1000;
+const BLOCK_SIZE = 10;
+const BLOCK_PIXELS = BLOCK_SIZE * BLOCK_SIZE;
+const PRICE_PER_PIXEL = 1;
+const BLOCKS_PER_ROW = GRID_SIZE / BLOCK_SIZE;
+const DA_URL = 'https://www.donationalerts.com/payment';  // ← ИСПРАВЛЕНО
+
 
             // ===== АДРЕС СЕРВЕРА НА RENDER =====
             const API_URL = 'https://pixel-map-server-lbfs.onrender.com';
