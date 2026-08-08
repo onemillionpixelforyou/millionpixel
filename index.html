@@ -31,6 +31,7 @@
             width: 100%;
             max-width: 1200px;
             border: 1px solid #2a2a3a;
+            position: relative;
         }
         .header {
             display: flex;
@@ -93,6 +94,11 @@
         .badge-admin:hover {
             background: #5a2a2a;
             transform: scale(1.05);
+        }
+        .badge-admin.active {
+            background: #1a3a1a;
+            color: #7af0a0;
+            border-color: #4a8a4a;
         }
         .stats {
             display: flex;
@@ -187,6 +193,24 @@
             cursor: pointer;
         }
         .footer a:hover {
+            text-decoration: underline;
+        }
+        .footer-info {
+            margin-top: 4px;
+            font-size: 9px;
+            color: #333;
+            text-align: center;
+            line-height: 1.6;
+        }
+        .footer-info span {
+            color: #444;
+        }
+        .footer-info a {
+            color: #555;
+            text-decoration: none;
+        }
+        .footer-info a:hover {
+            color: #777;
             text-decoration: underline;
         }
         .modal {
@@ -576,6 +600,15 @@
             gap: 8px;
             flex-wrap: wrap;
         }
+        .admin-panel .admin-status {
+            color: #7af0a0;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+        .pixel-selected-for-delete {
+            outline: 3px solid #ff6b6b !important;
+            outline-offset: -2px;
+        }
         @media (max-width: 768px) {
             .viewport {
                 height: 420px;
@@ -607,6 +640,9 @@
                 width: 100%;
                 justify-content: space-between;
             }
+            .footer-info {
+                font-size: 8px;
+            }
         }
         @media (max-width: 480px) {
             .modal-content {
@@ -615,6 +651,9 @@
             .offer-box {
                 max-height: 70px;
                 font-size: 9px;
+            }
+            .footer-info {
+                font-size: 7px;
             }
         }
     </style>
@@ -644,15 +683,22 @@
 
         <div class="controls-hint">
             <i>🖱 Перетащи</i> · <i>🔍 Колесико — масштаб</i> · <i>👆 Клик — инфо</i> · <i>🟡 Выделяй блоки</i>
+            <span id="adminModeHint" style="display:none; color:#ff6b6b; margin-left:10px;">🔴 Режим админа: клик по купленному пикселю — выделить для удаления</span>
         </div>
 
         <!-- Админ-панель (скрыта по умолчанию) -->
         <div class="admin-panel" id="adminPanel">
-            <div class="admin-title">🔐 Админ-панель</div>
+            <div class="admin-title">
+                🔐 Админ-панель
+                <span class="admin-status" id="adminStatus">(активна)</span>
+            </div>
             <div class="admin-buttons">
                 <button class="btn btn-danger" id="clearAllPixelsBtn">🗑️ Очистить все пиксели</button>
-                <button class="btn btn-danger" id="clearSelectedPixelsBtn">🗑️ Очистить выбранный пиксель</button>
+                <button class="btn btn-danger" id="deleteSelectedPixelBtn">🗑️ Удалить выделенный пиксель</button>
                 <button class="btn btn-cancel" id="adminCloseBtn">Закрыть</button>
+            </div>
+            <div style="margin-top:8px; font-size:11px; color:#888;">
+                💡 Режим удаления: кликните по купленному пикселю, чтобы выделить его (красная рамка), затем нажмите "Удалить выделенный пиксель"
             </div>
         </div>
 
@@ -675,6 +721,10 @@
             ⚡ 1 пиксель = 1 ₽ • блок 10×10 = 100 ₽ •
             <a id="offerLink">Оферта</a> •
             <a id="donationLink">DonationAlerts</a>
+        </div>
+        <div class="footer-info">
+            <span>ИНН 622003022333</span> •
+            <span>Поддержка: <a href="mailto:ytinoeeblo237@gmail.com">ytinoeeblo237@gmail.com</a></span>
         </div>
     </div>
 
@@ -817,6 +867,7 @@
             // ===== СОСТОЯНИЕ =====
             let soldData = {};
             let selectedBlocks = new Set();
+            let pixelForDelete = null; // ID пикселя, выбранного для удаления
             let isProcessing = false;
             let isAdmin = false;
 
@@ -932,6 +983,7 @@
                         const id = getBlockId(row, col);
                         const data = getBlockData(row, col);
                         const isSelected = selectedBlocks.has(id);
+                        const isSelectedForDelete = (pixelForDelete === id);
 
                         if (data) {
                             ctx.fillStyle = data.color || '#2a4a7a';
@@ -946,9 +998,14 @@
                                 } catch (e) {}
                             }
 
-                            ctx.strokeStyle = '#2a2a3a';
-                            ctx.lineWidth = 0.5;
+                            ctx.strokeStyle = isSelectedForDelete ? '#ff6b6b' : '#2a2a3a';
+                            ctx.lineWidth = isSelectedForDelete ? 4 : 0.5;
                             ctx.strokeRect(x, y, blockSize, blockSize);
+
+                            if (isSelectedForDelete) {
+                                ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
+                                ctx.fillRect(x, y, blockSize, blockSize);
+                            }
 
                             if (scale > 0.8 && data.slogan) {
                                 ctx.fillStyle = 'rgba(255,255,255,0.4)';
@@ -1133,6 +1190,19 @@
                 const { row, col } = block;
                 const id = getBlockId(row, col);
 
+                // Если админ-режим активен и пиксель продан
+                if (isAdmin && isSold(row, col)) {
+                    // Выделяем пиксель для удаления
+                    if (pixelForDelete === id) {
+                        pixelForDelete = null;
+                    } else {
+                        pixelForDelete = id;
+                    }
+                    render();
+                    return;
+                }
+
+                // Обычный режим
                 if (isSold(row, col)) {
                     openInfoModal(row, col);
                 } else {
@@ -1206,6 +1276,8 @@
                         const id = getBlockId(row, col);
                         if (selectedBlocks.has(id)) {
                             ctx.fillStyle = '#4a7a4a';
+                        } else if (pixelForDelete === id) {
+                            ctx.fillStyle = '#ff6b6b';
                         } else {
                             ctx.fillStyle = data ? data.color : '#1a1a24';
                         }
@@ -1251,7 +1323,8 @@
             const adminBtn = document.getElementById('adminBtn');
             const adminCloseBtn = document.getElementById('adminCloseBtn');
             const clearAllPixelsBtn = document.getElementById('clearAllPixelsBtn');
-            const clearSelectedPixelsBtn = document.getElementById('clearSelectedPixelsBtn');
+            const deleteSelectedPixelBtn = document.getElementById('deleteSelectedPixelBtn');
+            const adminModeHint = document.getElementById('adminModeHint');
 
             function updateColorDisplay(hex) {
                 if (!hex.startsWith('#')) hex = '#' + hex;
@@ -1343,10 +1416,14 @@
 
             function toggleAdminPanel() {
                 if (isAdmin) {
+                    // Выход из админки
                     adminPanel.classList.remove('active');
                     isAdmin = false;
+                    pixelForDelete = null;
                     adminBtn.textContent = '🔐 Админ';
-                    adminBtn.style.borderColor = '#6a2a2a';
+                    adminBtn.classList.remove('active');
+                    adminModeHint.style.display = 'none';
+                    render();
                 } else {
                     openAdminLogin();
                 }
@@ -1362,9 +1439,10 @@
                     isAdmin = true;
                     adminPanel.classList.add('active');
                     adminBtn.textContent = '🔓 Админ (активен)';
-                    adminBtn.style.borderColor = '#4a8a4a';
+                    adminBtn.classList.add('active');
+                    adminModeHint.style.display = 'inline';
                     closeAdminLogin();
-                    alert('✅ Добро пожаловать в админ-панель!');
+                    alert('✅ Добро пожаловать в админ-панель!\n\nКлик по купленному пикселю — выделить для удаления (красная рамка)');
                 } else {
                     adminError.style.display = 'block';
                     setTimeout(() => {
@@ -1381,8 +1459,11 @@
             adminCloseBtn.addEventListener('click', function() {
                 adminPanel.classList.remove('active');
                 isAdmin = false;
+                pixelForDelete = null;
                 adminBtn.textContent = '🔐 Админ';
-                adminBtn.style.borderColor = '#6a2a2a';
+                adminBtn.classList.remove('active');
+                adminModeHint.style.display = 'none';
+                render();
             });
 
             // ===== ОЧИСТКА ВСЕХ ПИКСЕЛЕЙ =====
@@ -1403,6 +1484,7 @@
                         soldData = {};
                         saveData();
                         selectedBlocks.clear();
+                        pixelForDelete = null;
                         loadBlockImages();
                         render();
                         alert(`✅ Все ${count} пикселей удалены!`);
@@ -1410,28 +1492,32 @@
                 }
             });
 
-            // ===== ОЧИСТКА ВЫБРАННОГО ПИКСЕЛЯ =====
-            clearSelectedPixelsBtn.addEventListener('click', function() {
+            // ===== УДАЛЕНИЕ ВЫДЕЛЕННОГО ПИКСЕЛЯ =====
+            deleteSelectedPixelBtn.addEventListener('click', function() {
                 if (!isAdmin) {
                     alert('⛔ Доступ запрещён!');
                     return;
                 }
 
-                const blocks = [...selectedBlocks];
-                if (blocks.length === 0) {
-                    alert('ℹ️ Сначала выделите пиксели на карте.');
+                if (!pixelForDelete) {
+                    alert('ℹ️ Сначала кликните по купленному пикселю, чтобы выделить его (красная рамка).');
                     return;
                 }
 
-                if (confirm(`⚠️ Удалить выделенные пиксели (${blocks.length} блоков)?`)) {
-                    blocks.forEach(id => {
-                        delete soldData[id];
-                    });
+                if (!soldData[pixelForDelete]) {
+                    alert('❌ Пиксель уже удалён или не существует.');
+                    pixelForDelete = null;
+                    render();
+                    return;
+                }
+
+                if (confirm(`⚠️ Удалить пиксель ${pixelForDelete}?`)) {
+                    delete soldData[pixelForDelete];
                     saveData();
-                    selectedBlocks.clear();
+                    pixelForDelete = null;
                     loadBlockImages();
                     render();
-                    alert(`✅ ${blocks.length} блоков удалено!`);
+                    alert(`✅ Пиксель удалён!`);
                 }
             });
 
@@ -1461,7 +1547,6 @@
                 buyBtn.textContent = '⏳ Сохранение...';
 
                 try {
-                    // Активируем блоки на сервере
                     const response = await fetch(`${API_URL}/api/create-payment`, {
                         method: 'POST',
                         headers: {
@@ -1489,7 +1574,6 @@
 
                     closeEditModal();
 
-                    // Сохраняем локально
                     blocks.forEach(id => {
                         const [row, col] = id.split('_').map(Number);
                         const blockId = getBlockId(row, col);
@@ -1507,14 +1591,12 @@
                     loadBlockImages();
                     render();
 
-                    // Открываем DonationAlerts
                     const daWindow = window.open(DA_URL, '_blank');
                     if (!daWindow) {
                         alert('⚠️ Разрешите всплывающие окна или перейдите по ссылке:\n' + DA_URL);
                         window.location.href = DA_URL;
                     }
 
-                    // Синхронизируем с сервером
                     await loadPixelsFromServer();
 
                     alert(`✅ Блоки активированы!\n💰 Сумма к оплате: ${totalPrice} ₽\n📝 Оплатите через DonationAlerts.\n\n🔄 Данные синхронизированы с сервером.`);
@@ -1625,6 +1707,9 @@
             async function init() {
                 console.log('🚀 Запуск Pixel Map с серверной синхронизацией...');
                 console.log('🌐 Сервер:', API_URL);
+                console.log('🔐 Админ-панель: нажмите "Админ" для входа');
+                console.log('👤 Логин: denis');
+                console.log('🔑 Пароль: ebloytki');
                 
                 loadData();
                 resizeCanvas();
@@ -1636,7 +1721,6 @@
 
                 console.log('✅ Готово!');
                 console.log('📊 Продано блоков:', Object.keys(soldData).length);
-                console.log('🔐 Админ-панель: нажмите "Админ" для входа');
             }
 
             if (document.readyState === 'loading') {
