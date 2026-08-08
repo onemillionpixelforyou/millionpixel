@@ -78,6 +78,22 @@
             background: #5a3a2a;
             transform: scale(1.05);
         }
+        .badge-admin {
+            background: #3a1a1a;
+            color: #ff6b6b;
+            border-color: #6a2a2a;
+            cursor: pointer;
+            transition: 0.2s;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            border: 1px solid #6a2a2a;
+        }
+        .badge-admin:hover {
+            background: #5a2a2a;
+            transform: scale(1.05);
+        }
         .stats {
             display: flex;
             justify-content: space-between;
@@ -234,6 +250,21 @@
             resize: vertical;
             min-height: 50px;
         }
+        .modal-content input[type="password"] {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #2a2a3a;
+            background: #0a0a12;
+            color: #eee;
+            font-size: 13px;
+            outline: none;
+            font-family: inherit;
+        }
+        .modal-content input[type="password"]:focus {
+            border-color: #f5c842;
+            box-shadow: 0 0 0 2px rgba(245, 200, 66, 0.1);
+        }
         .price-tag {
             background: #0a0a12;
             padding: 8px;
@@ -367,6 +398,15 @@
             opacity: 0.4;
             cursor: not-allowed;
             transform: none;
+        }
+        .btn-danger {
+            background: #6a2a2a;
+            color: #ff6b6b;
+            border: 1px solid #8a4a4a;
+        }
+        .btn-danger:hover {
+            background: #8a3a3a;
+            transform: scale(1.02);
         }
         .btn-cancel {
             background: #2a2a3a;
@@ -514,6 +554,28 @@
         .offer-section-title span {
             color: #f5c842;
         }
+        .admin-panel {
+            display: none;
+            background: #1a1a2a;
+            border: 1px solid #ff6b6b;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+        .admin-panel.active {
+            display: block;
+        }
+        .admin-panel .admin-title {
+            color: #ff6b6b;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .admin-panel .admin-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
         @media (max-width: 768px) {
             .viewport {
                 height: 420px;
@@ -568,6 +630,7 @@
             <div class="header-right">
                 <span class="badge-rus badge-da" id="donationAlertBtn">🎁 DonationAlerts</span>
                 <span class="badge-rus" style="background:#1a3a2a;color:#7af0a0;">📜 Оферта</span>
+                <span class="badge-admin" id="adminBtn">🔐 Админ</span>
             </div>
         </div>
 
@@ -581,6 +644,16 @@
 
         <div class="controls-hint">
             <i>🖱 Перетащи</i> · <i>🔍 Колесико — масштаб</i> · <i>👆 Клик — инфо</i> · <i>🟡 Выделяй блоки</i>
+        </div>
+
+        <!-- Админ-панель (скрыта по умолчанию) -->
+        <div class="admin-panel" id="adminPanel">
+            <div class="admin-title">🔐 Админ-панель</div>
+            <div class="admin-buttons">
+                <button class="btn btn-danger" id="clearAllPixelsBtn">🗑️ Очистить все пиксели</button>
+                <button class="btn btn-danger" id="clearSelectedPixelsBtn">🗑️ Очистить выбранный пиксель</button>
+                <button class="btn btn-cancel" id="adminCloseBtn">Закрыть</button>
+            </div>
         </div>
 
         <div class="selection-hint" id="selectionHint" style="display:none;">
@@ -606,6 +679,24 @@
     </div>
 
     <!-- ===== МОДАЛКИ ===== -->
+
+    <!-- Модалка для админ-входа -->
+    <div class="modal" id="adminLoginModal">
+        <div class="modal-content">
+            <h2>🔐 Вход в админ-панель</h2>
+            <p style="color:#888; font-size:13px; text-align:center; margin-bottom:15px;">Введите логин и пароль для доступа</p>
+            <label>👤 Логин</label>
+            <input type="text" id="adminLoginInput" placeholder="Введите логин" style="margin-bottom:10px;">
+            <label>🔑 Пароль</label>
+            <input type="password" id="adminPasswordInput" placeholder="Введите пароль">
+            <div style="margin-top:15px; color:#ff6b6b; font-size:12px; text-align:center; display:none;" id="adminError">❌ Неверный логин или пароль!</div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" id="adminLoginCancelBtn">Отмена</button>
+                <button class="btn btn-da" id="adminLoginBtn">🔑 Войти</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="editModal">
         <div class="modal-content">
             <h2 id="modalTitle">🏷️ Купить блоки</h2>
@@ -719,10 +810,15 @@
             const API_URL = 'https://pixel-map-server-lbfs.onrender.com';
             const DA_URL = 'https://www.donationalerts.com/r/rvdqs';
 
+            // ===== АДМИН-ДАННЫЕ =====
+            const ADMIN_LOGIN = 'denis';
+            const ADMIN_PASSWORD = 'ebloytki';
+
             // ===== СОСТОЯНИЕ =====
             let soldData = {};
             let selectedBlocks = new Set();
             let isProcessing = false;
+            let isAdmin = false;
 
             // ===== ЗАГРУЗКА С СЕРВЕРА =====
             async function loadPixelsFromServer() {
@@ -734,7 +830,6 @@
                     soldData = data.sold || {};
                     console.log('✅ Данные загружены, блоков:', Object.keys(soldData).length);
                     
-                    // Сохраняем в localStorage как кеш
                     try {
                         localStorage.setItem('pixelGridData', JSON.stringify(soldData));
                     } catch (e) {}
@@ -1145,6 +1240,19 @@
             const cancelBtn = document.getElementById('cancelBtn');
             const buyBtn = document.getElementById('buyBtn');
 
+            // ===== АДМИН-МОДАЛКА =====
+            const adminLoginModal = document.getElementById('adminLoginModal');
+            const adminLoginInput = document.getElementById('adminLoginInput');
+            const adminPasswordInput = document.getElementById('adminPasswordInput');
+            const adminLoginBtn = document.getElementById('adminLoginBtn');
+            const adminLoginCancelBtn = document.getElementById('adminLoginCancelBtn');
+            const adminError = document.getElementById('adminError');
+            const adminPanel = document.getElementById('adminPanel');
+            const adminBtn = document.getElementById('adminBtn');
+            const adminCloseBtn = document.getElementById('adminCloseBtn');
+            const clearAllPixelsBtn = document.getElementById('clearAllPixelsBtn');
+            const clearSelectedPixelsBtn = document.getElementById('clearSelectedPixelsBtn');
+
             function updateColorDisplay(hex) {
                 if (!hex.startsWith('#')) hex = '#' + hex;
                 colorSwatch.style.background = hex;
@@ -1221,6 +1329,112 @@
                 if (e.target === editModal) closeEditModal();
             });
 
+            // ===== АДМИН-ФУНКЦИИ =====
+            function openAdminLogin() {
+                adminLoginInput.value = '';
+                adminPasswordInput.value = '';
+                adminError.style.display = 'none';
+                adminLoginModal.classList.add('active');
+            }
+
+            function closeAdminLogin() {
+                adminLoginModal.classList.remove('active');
+            }
+
+            function toggleAdminPanel() {
+                if (isAdmin) {
+                    adminPanel.classList.remove('active');
+                    isAdmin = false;
+                    adminBtn.textContent = '🔐 Админ';
+                    adminBtn.style.borderColor = '#6a2a2a';
+                } else {
+                    openAdminLogin();
+                }
+            }
+
+            adminBtn.addEventListener('click', toggleAdminPanel);
+
+            adminLoginBtn.addEventListener('click', function() {
+                const login = adminLoginInput.value.trim();
+                const password = adminPasswordInput.value.trim();
+
+                if (login === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
+                    isAdmin = true;
+                    adminPanel.classList.add('active');
+                    adminBtn.textContent = '🔓 Админ (активен)';
+                    adminBtn.style.borderColor = '#4a8a4a';
+                    closeAdminLogin();
+                    alert('✅ Добро пожаловать в админ-панель!');
+                } else {
+                    adminError.style.display = 'block';
+                    setTimeout(() => {
+                        adminError.style.display = 'none';
+                    }, 3000);
+                }
+            });
+
+            adminLoginCancelBtn.addEventListener('click', closeAdminLogin);
+            adminLoginModal.addEventListener('click', function(e) {
+                if (e.target === adminLoginModal) closeAdminLogin();
+            });
+
+            adminCloseBtn.addEventListener('click', function() {
+                adminPanel.classList.remove('active');
+                isAdmin = false;
+                adminBtn.textContent = '🔐 Админ';
+                adminBtn.style.borderColor = '#6a2a2a';
+            });
+
+            // ===== ОЧИСТКА ВСЕХ ПИКСЕЛЕЙ =====
+            clearAllPixelsBtn.addEventListener('click', function() {
+                if (!isAdmin) {
+                    alert('⛔ Доступ запрещён!');
+                    return;
+                }
+
+                const count = Object.keys(soldData).length;
+                if (count === 0) {
+                    alert('ℹ️ Нет пикселей для очистки.');
+                    return;
+                }
+
+                if (confirm(`⚠️ ВНИМАНИЕ! Вы действительно хотите удалить ВСЕ ${count} проданных пикселей?\nЭто действие НЕЛЬЗЯ будет отменить!`)) {
+                    if (confirm('🔴 ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ! Удалить все пиксели?')) {
+                        soldData = {};
+                        saveData();
+                        selectedBlocks.clear();
+                        loadBlockImages();
+                        render();
+                        alert(`✅ Все ${count} пикселей удалены!`);
+                    }
+                }
+            });
+
+            // ===== ОЧИСТКА ВЫБРАННОГО ПИКСЕЛЯ =====
+            clearSelectedPixelsBtn.addEventListener('click', function() {
+                if (!isAdmin) {
+                    alert('⛔ Доступ запрещён!');
+                    return;
+                }
+
+                const blocks = [...selectedBlocks];
+                if (blocks.length === 0) {
+                    alert('ℹ️ Сначала выделите пиксели на карте.');
+                    return;
+                }
+
+                if (confirm(`⚠️ Удалить выделенные пиксели (${blocks.length} блоков)?`)) {
+                    blocks.forEach(id => {
+                        delete soldData[id];
+                    });
+                    saveData();
+                    selectedBlocks.clear();
+                    loadBlockImages();
+                    render();
+                    alert(`✅ ${blocks.length} блоков удалено!`);
+                }
+            });
+
             // ===== ПОКУПКА =====
             buyBtn.addEventListener('click', async function() {
                 if (isProcessing) return;
@@ -1247,7 +1461,7 @@
                 buyBtn.textContent = '⏳ Сохранение...';
 
                 try {
-                    // Активируем блоки на сервере через транзакцию
+                    // Активируем блоки на сервере
                     const response = await fetch(`${API_URL}/api/create-payment`, {
                         method: 'POST',
                         headers: {
@@ -1273,10 +1487,9 @@
                         return;
                     }
 
-                    // Активируем блоки локально и на сервере через callback
                     closeEditModal();
 
-                    // Сначала сохраняем локально для мгновенного отображения
+                    // Сохраняем локально
                     blocks.forEach(id => {
                         const [row, col] = id.split('_').map(Number);
                         const blockId = getBlockId(row, col);
@@ -1423,6 +1636,7 @@
 
                 console.log('✅ Готово!');
                 console.log('📊 Продано блоков:', Object.keys(soldData).length);
+                console.log('🔐 Админ-панель: нажмите "Админ" для входа');
             }
 
             if (document.readyState === 'loading') {
