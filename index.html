@@ -708,9 +708,6 @@
         (function() {
             'use strict';
 
-            console.log('🚀 Запуск Pixel Map...');
-            console.log('📍 Версия: серверная синхронизация');
-
             // ===== КОНФИГ =====
             const GRID_SIZE = 1000;
             const BLOCK_SIZE = 10;
@@ -720,16 +717,12 @@
             
             // ===== АДРЕС СЕРВЕРА =====
             const API_URL = 'https://pixel-map-server-lbfs.onrender.com';
-            console.log('🌐 Сервер:', API_URL);
-            
+            const DA_URL = 'https://www.donationalerts.com/r/rvdqs';
+
             // ===== СОСТОЯНИЕ =====
             let soldData = {};
             let selectedBlocks = new Set();
-            let currentTransactionId = null;
-            let transactionCheckInterval = null;
             let isProcessing = false;
-
-            console.log('✅ Конфигурация загружена');
 
             // ===== ЗАГРУЗКА С СЕРВЕРА =====
             async function loadPixelsFromServer() {
@@ -751,7 +744,6 @@
                     console.log('✅ Данные синхронизированы с сервером');
                 } catch (error) {
                     console.error('❌ Ошибка загрузки с сервера:', error);
-                    // Используем локальные данные как резерв
                     loadData();
                     render();
                 }
@@ -759,26 +751,17 @@
 
             // ===== ЗАГРУЗКА / СОХРАНЕНИЕ (локальный резерв) =====
             function loadData() {
-                console.log('📂 Загрузка из localStorage...');
                 try {
                     const saved = localStorage.getItem('pixelGridData');
                     if (saved) {
                         try {
                             soldData = JSON.parse(saved);
-                            console.log('✅ Загружено из localStorage, блоков:', Object.keys(soldData).length);
                         } catch (e) {
                             soldData = {};
-                            console.warn('⚠️ Ошибка парсинга localStorage');
                         }
                         if (typeof soldData !== 'object' || Array.isArray(soldData)) soldData = {};
-                    } else {
-                        console.log('📂 Нет данных в localStorage');
-                        soldData = {};
                     }
-                } catch (e) { 
-                    soldData = {};
-                    console.error('❌ Ошибка доступа к localStorage:', e);
-                }
+                } catch (e) { soldData = {}; }
             }
 
             function saveData() {
@@ -788,7 +771,6 @@
                     if (e.name === 'QuotaExceededError') {
                         alert('⚠️ Хранилище переполнено. Удалите старые блоки.');
                     }
-                    console.error('❌ Ошибка сохранения в localStorage:', e);
                 }
             }
 
@@ -798,14 +780,10 @@
 
             function getBlockData(row, col) { return soldData[getBlockId(row, col)] || null; }
 
-            console.log('✅ Функции загрузки готовы');
-
             // ===== CANVAS РЕНДЕРИНГ =====
             const canvas = document.getElementById('pixel-canvas');
             const ctx = canvas.getContext('2d');
             const viewport = document.getElementById('viewport');
-
-            console.log('✅ Canvas найден');
 
             const BLOCK_RENDER_SIZE = 10;
 
@@ -819,7 +797,6 @@
             let translateX = 0, translateY = 0;
 
             function resizeCanvas() {
-                console.log('📐 Ресайз Canvas...');
                 const size = getCanvasSize();
                 const dpr = window.devicePixelRatio || 1;
                 canvasWidth = size.width * dpr;
@@ -831,17 +808,11 @@
                 ctx.scale(dpr, dpr);
                 canvasWidth = size.width;
                 canvasHeight = size.height;
-                console.log('✅ Canvas размер:', canvasWidth, 'x', canvasHeight);
             }
 
             function render() {
                 const w = canvasWidth;
                 const h = canvasHeight;
-
-                if (w === 0 || h === 0) {
-                    console.warn('⚠️ Canvas не инициализирован');
-                    return;
-                }
 
                 ctx.fillStyle = '#08080e';
                 ctx.fillRect(0, 0, w, h);
@@ -917,8 +888,6 @@
                 let loadedCount = 0;
                 const total = Object.keys(soldData).length;
 
-                console.log('🖼 Загрузка изображений...', total);
-
                 for (const id in soldData) {
                     const data = soldData[id];
                     if (data.image && !data._imgLoaded) {
@@ -950,18 +919,11 @@
                 const freePixels = total - soldPixels;
                 const earned = soldPixels * PRICE_PER_PIXEL;
 
-                const totalEl = document.getElementById('total-pixels');
-                const freeEl = document.getElementById('free-pixels');
-                const soldEl = document.getElementById('sold-pixels');
-                const earnedEl = document.getElementById('earned');
-
-                if (totalEl) totalEl.textContent = total.toLocaleString('ru-RU');
-                if (freeEl) freeEl.textContent = freePixels.toLocaleString('ru-RU');
-                if (soldEl) soldEl.textContent = soldPixels.toLocaleString('ru-RU');
-                if (earnedEl) earnedEl.textContent = earned.toLocaleString('ru-RU');
-                
-                const zoomEl = document.getElementById('zoom-level');
-                if (zoomEl) zoomEl.textContent = Math.round(scale * 100) + '%';
+                document.getElementById('total-pixels').textContent = total.toLocaleString('ru-RU');
+                document.getElementById('free-pixels').textContent = freePixels.toLocaleString('ru-RU');
+                document.getElementById('sold-pixels').textContent = soldPixels.toLocaleString('ru-RU');
+                document.getElementById('earned').textContent = earned.toLocaleString('ru-RU');
+                document.getElementById('zoom-level').textContent = Math.round(scale * 100) + '%';
             }
 
             // ===== ПАНОРАМИРОВАНИЕ =====
@@ -976,7 +938,6 @@
             }
 
             function centerGrid() {
-                console.log('🎯 Центрирование карты...');
                 const w = canvasWidth;
                 const h = canvasHeight;
                 const gridW = BLOCKS_PER_ROW * BLOCK_RENDER_SIZE;
@@ -987,7 +948,6 @@
                 translateX = (w - gridW * scale) / 2;
                 translateY = (h - gridH * scale) / 2;
                 updateTransform();
-                console.log('✅ Карта отцентрирована, масштаб:', scale);
             }
 
             viewport.addEventListener('mousedown', function(e) {
@@ -1110,16 +1070,14 @@
                 const price = pixels * PRICE_PER_PIXEL;
 
                 if (count === 0) {
-                    if (hint) hint.style.display = 'none';
+                    hint.style.display = 'none';
                     return;
                 }
 
-                if (hint) {
-                    hint.style.display = 'flex';
-                    document.getElementById('selectedCount').textContent = count;
-                    document.getElementById('selectedPixelsCount').textContent = pixels.toLocaleString('ru-RU');
-                    document.getElementById('selectedPrice').textContent = price.toLocaleString('ru-RU');
-                }
+                hint.style.display = 'flex';
+                document.getElementById('selectedCount').textContent = count;
+                document.getElementById('selectedPixelsCount').textContent = pixels.toLocaleString('ru-RU');
+                document.getElementById('selectedPrice').textContent = price.toLocaleString('ru-RU');
             }
 
             document.getElementById('clearSelectionBtn').addEventListener('click', clearSelection);
@@ -1134,8 +1092,6 @@
 
             function updateMinimap() {
                 const canvas = minimapCanvas;
-                if (!canvas) return;
-                
                 const rect = canvas.parentElement.getBoundingClientRect();
                 const size = Math.min(rect.width, rect.height);
 
@@ -1189,22 +1145,17 @@
             const cancelBtn = document.getElementById('cancelBtn');
             const buyBtn = document.getElementById('buyBtn');
 
-            console.log('✅ Элементы модалки найдены');
-
             function updateColorDisplay(hex) {
                 if (!hex.startsWith('#')) hex = '#' + hex;
-                if (colorSwatch) colorSwatch.style.background = hex;
-                if (colorHexDisplay) colorHexDisplay.textContent = hex.toUpperCase();
+                colorSwatch.style.background = hex;
+                colorHexDisplay.textContent = hex.toUpperCase();
             }
 
-            if (colorInput) {
-                colorInput.addEventListener('input', function() {
-                    updateColorDisplay(this.value);
-                });
-            }
+            colorInput.addEventListener('input', function() {
+                updateColorDisplay(this.value);
+            });
 
             function previewImage(src) {
-                if (!imagePreview) return;
                 if (src && src.trim() !== '') {
                     imagePreview.innerHTML = '<img src="' + src + '" alt="Предпросмотр" loading="lazy">';
                 } else {
@@ -1213,293 +1164,157 @@
             }
 
             let previewTimeout = null;
-            if (imageUrlInput) {
-                imageUrlInput.addEventListener('input', function() {
-                    clearTimeout(previewTimeout);
-                    previewTimeout = setTimeout(function() {
-                        previewImage(imageUrlInput.value);
-                    }, 200);
-                });
-            }
+            imageUrlInput.addEventListener('input', function() {
+                clearTimeout(previewTimeout);
+                previewTimeout = setTimeout(function() {
+                    previewImage(imageUrlInput.value);
+                }, 200);
+            });
 
-            if (imageFileInput) {
-                imageFileInput.addEventListener('change', function(e) {
-                    const file = e.target.files[0];
-                    if (file) {
-                        const reader = new FileReader();
-                        reader.onload = function(event) {
-                            const dataUrl = event.target.result;
-                            if (imageUrlInput) imageUrlInput.value = dataUrl;
-                            previewImage(dataUrl);
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                });
-            }
+            imageFileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const dataUrl = event.target.result;
+                        imageUrlInput.value = dataUrl;
+                        previewImage(dataUrl);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
 
             function openBulkEditModal() {
                 const count = selectedBlocks.size;
                 const pixels = count * BLOCK_PIXELS;
                 const price = pixels * PRICE_PER_PIXEL;
 
-                if (modalTitle) modalTitle.textContent = '🏷️ Купить ' + count + ' блоков';
-                if (priceAmount) priceAmount.textContent = price.toLocaleString('ru-RU');
+                modalTitle.textContent = '🏷️ Купить ' + count + ' блоков';
+                priceAmount.textContent = price.toLocaleString('ru-RU');
 
                 const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
-                if (colorInput) {
-                    colorInput.value = randomColor;
-                    updateColorDisplay(randomColor);
-                }
+                colorInput.value = randomColor;
+                updateColorDisplay(randomColor);
 
-                if (imageUrlInput) {
-                    imageUrlInput.value = '';
-                    previewImage('');
-                }
-                if (linkInput) linkInput.value = 'https://example.com';
-                if (sloganInput) sloganInput.value = 'Блок ' + count + 'шт';
-                if (buyBtn) {
-                    buyBtn.textContent = '💰 Купить за ' + price + ' ₽';
-                    buyBtn.disabled = true;
-                }
-                if (agreeCheckbox) agreeCheckbox.checked = false;
+                imageUrlInput.value = '';
+                previewImage('');
+                linkInput.value = 'https://example.com';
+                sloganInput.value = 'Блок ' + count + 'шт';
+                buyBtn.textContent = '💰 Купить за ' + price + ' ₽';
+                buyBtn.disabled = true;
+                agreeCheckbox.checked = false;
 
-                if (editModal) editModal.classList.add('active');
+                editModal.classList.add('active');
             }
 
             function closeEditModal() {
-                if (editModal) editModal.classList.remove('active');
-                if (imageFileInput) imageFileInput.value = '';
+                editModal.classList.remove('active');
+                imageFileInput.value = '';
             }
 
-            if (agreeCheckbox) {
-                agreeCheckbox.addEventListener('change', function() {
-                    if (buyBtn) buyBtn.disabled = !this.checked;
-                });
-            }
+            agreeCheckbox.addEventListener('change', function() {
+                buyBtn.disabled = !this.checked;
+            });
 
-            if (cancelBtn) {
-                cancelBtn.addEventListener('click', closeEditModal);
-            }
+            cancelBtn.addEventListener('click', closeEditModal);
+            editModal.addEventListener('click', function(e) {
+                if (e.target === editModal) closeEditModal();
+            });
 
-            if (editModal) {
-                editModal.addEventListener('click', function(e) {
-                    if (e.target === editModal) closeEditModal();
-                });
-            }
+            // ===== ПОКУПКА =====
+            buyBtn.addEventListener('click', async function() {
+                if (isProcessing) return;
+                
+                if (!agreeCheckbox.checked) {
+                    alert('⚠️ Примите условия оферты.');
+                    return;
+                }
 
-            // ===== ПОКУПКА ЧЕРЕЗ СЕРВЕР =====
-            if (buyBtn) {
-                buyBtn.addEventListener('click', async function() {
-                    if (isProcessing) return;
-                    
-                    if (!agreeCheckbox || !agreeCheckbox.checked) {
-                        alert('⚠️ Примите условия оферты.');
-                        return;
-                    }
+                const blocks = [...selectedBlocks];
+                if (blocks.length === 0) {
+                    alert('⚠️ Не выбрано ни одного блока.');
+                    return;
+                }
 
-                    const blocks = [...selectedBlocks];
-                    if (blocks.length === 0) {
-                        alert('⚠️ Не выбрано ни одного блока.');
-                        return;
-                    }
+                const color = colorInput.value.trim() || '#2a4a7a';
+                const image = imageUrlInput.value.trim() || '';
+                const link = linkInput.value.trim() || '#';
+                const slogan = sloganInput.value.trim() || 'Без описания';
+                const totalPrice = blocks.length * BLOCK_PIXELS * PRICE_PER_PIXEL;
 
-                    const color = colorInput ? colorInput.value.trim() : '#2a4a7a';
-                    const image = imageUrlInput ? imageUrlInput.value.trim() : '';
-                    const link = linkInput ? linkInput.value.trim() : '#';
-                    const slogan = sloganInput ? sloganInput.value.trim() : 'Без описания';
-                    const totalPrice = blocks.length * BLOCK_PIXELS * PRICE_PER_PIXEL;
+                isProcessing = true;
+                buyBtn.disabled = true;
+                buyBtn.textContent = '⏳ Сохранение...';
 
-                    isProcessing = true;
-                    buyBtn.disabled = true;
-                    buyBtn.textContent = '⏳ Создание платежа...';
+                try {
+                    // Активируем блоки на сервере через транзакцию
+                    const response = await fetch(`${API_URL}/api/create-payment`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            blocks: blocks,
+                            color: color,
+                            image: image,
+                            link: link,
+                            slogan: slogan,
+                            totalPrice: totalPrice
+                        })
+                    });
 
-                    try {
-                        const response = await fetch(`${API_URL}/api/create-payment`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                blocks: blocks,
-                                color: color,
-                                image: image,
-                                link: link,
-                                slogan: slogan,
-                                totalPrice: totalPrice
-                            })
-                        });
+                    const data = await response.json();
 
-                        const data = await response.json();
-
-                        if (!data.success) {
-                            alert('❌ ' + (data.error || 'Ошибка при создании платежа'));
-                            isProcessing = false;
-                            buyBtn.disabled = false;
-                            buyBtn.textContent = '💰 Купить';
-                            return;
-                        }
-
-                        currentTransactionId = data.transactionId;
-                        closeEditModal();
-
-                        const daWindow = window.open(data.paymentUrl, '_blank', 'width=600,height=700');
-
-                        if (!daWindow) {
-                            alert('⚠️ Разрешите всплывающие окна или откройте ссылку вручную:\n' + data.paymentUrl);
-                            window.location.href = data.paymentUrl;
-                            return;
-                        }
-
-                        startTransactionCheck(data.transactionId);
-                        showNotification('💳 Платёж создан. После оплаты блоки активируются автоматически.', 'info');
-
-                    } catch (error) {
-                        console.error('Payment error:', error);
-                        alert('❌ Ошибка при создании платежа. Попробуйте позже.');
+                    if (!data.success) {
+                        alert('❌ ' + (data.error || 'Ошибка при создании платежа'));
                         isProcessing = false;
                         buyBtn.disabled = false;
                         buyBtn.textContent = '💰 Купить';
+                        return;
                     }
-                });
-            }
 
-            // ===== ПРОВЕРКА ТРАНЗАКЦИИ =====
-            function startTransactionCheck(transactionId) {
-                if (transactionCheckInterval) {
-                    clearInterval(transactionCheckInterval);
-                    transactionCheckInterval = null;
-                }
+                    // Активируем блоки локально и на сервере через callback
+                    closeEditModal();
 
-                let attempts = 0;
-                const maxAttempts = 120;
+                    // Сначала сохраняем локально для мгновенного отображения
+                    blocks.forEach(id => {
+                        const [row, col] = id.split('_').map(Number);
+                        const blockId = getBlockId(row, col);
+                        soldData[blockId] = {
+                            color: color,
+                            image: image,
+                            link: link,
+                            slogan: slogan,
+                            purchasedAt: new Date().toISOString()
+                        };
+                    });
 
-                transactionCheckInterval = setInterval(async () => {
-                    attempts++;
+                    saveData();
+                    selectedBlocks.clear();
+                    loadBlockImages();
+                    render();
 
-                    try {
-                        const response = await fetch(`${API_URL}/api/transaction/${transactionId}`);
-                        if (!response.ok) throw new Error('Ошибка получения статуса');
-
-                        const data = await response.json();
-                        console.log(`📊 Статус транзакции ${transactionId}: ${data.status}`);
-
-                        if (data.status === 'completed') {
-                            clearInterval(transactionCheckInterval);
-                            transactionCheckInterval = null;
-                            
-                            await loadPixelsFromServer();
-                            
-                            selectedBlocks.clear();
-                            render();
-                            showNotification('✅ Оплата успешна! Блоки активированы.', 'success');
-                            currentTransactionId = null;
-                            isProcessing = false;
-                            if (buyBtn) {
-                                buyBtn.disabled = false;
-                                buyBtn.textContent = '💰 Купить';
-                            }
-                        } else if (data.status === 'failed' || data.status === 'cancelled') {
-                            clearInterval(transactionCheckInterval);
-                            transactionCheckInterval = null;
-                            showNotification('❌ Платеж не был завершен. Попробуйте снова.', 'error');
-                            currentTransactionId = null;
-                            isProcessing = false;
-                            if (buyBtn) {
-                                buyBtn.disabled = false;
-                                buyBtn.textContent = '💰 Купить';
-                            }
-                        } else if (attempts >= maxAttempts) {
-                            clearInterval(transactionCheckInterval);
-                            transactionCheckInterval = null;
-                            showNotification('⏰ Время ожидания истекло. Проверьте статус платежа вручную.', 'warning');
-                            currentTransactionId = null;
-                            isProcessing = false;
-                            if (buyBtn) {
-                                buyBtn.disabled = false;
-                                buyBtn.textContent = '💰 Купить';
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error checking transaction:', error);
-                        if (attempts >= maxAttempts) {
-                            clearInterval(transactionCheckInterval);
-                            transactionCheckInterval = null;
-                            currentTransactionId = null;
-                            isProcessing = false;
-                            if (buyBtn) {
-                                buyBtn.disabled = false;
-                                buyBtn.textContent = '💰 Купить';
-                            }
-                        }
+                    // Открываем DonationAlerts
+                    const daWindow = window.open(DA_URL, '_blank');
+                    if (!daWindow) {
+                        alert('⚠️ Разрешите всплывающие окна или перейдите по ссылке:\n' + DA_URL);
+                        window.location.href = DA_URL;
                     }
-                }, 3000);
-            }
 
-            // ===== ПРОВЕРКА ВОЗВРАТА =====
-            async function checkPaymentReturn() {
-                const urlParams = new URLSearchParams(window.location.search);
-                const paymentStatus = urlParams.get('payment');
-                const transactionId = urlParams.get('transaction');
-
-                console.log('🔍 Проверка возврата:', paymentStatus, transactionId);
-
-                if (paymentStatus === 'success' && transactionId) {
+                    // Синхронизируем с сервером
                     await loadPixelsFromServer();
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                    showNotification('✅ Оплата подтверждена! Блоки активированы.', 'success');
-                } else if (paymentStatus === 'failed' && transactionId) {
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                    showNotification('❌ Платеж не был завершен. Попробуйте снова.', 'error');
-                } else if (paymentStatus === 'already_completed' && transactionId) {
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                    showNotification('✅ Блоки уже активированы!', 'success');
+
+                    alert(`✅ Блоки активированы!\n💰 Сумма к оплате: ${totalPrice} ₽\n📝 Оплатите через DonationAlerts.\n\n🔄 Данные синхронизированы с сервером.`);
+
+                } catch (error) {
+                    console.error('Payment error:', error);
+                    alert('❌ Ошибка при создании платежа. Попробуйте позже.');
                 }
-            }
 
-            // ===== УВЕДОМЛЕНИЯ =====
-            function showNotification(message, type = 'info') {
-                console.log('📢 Уведомление:', message, type);
-                
-                const notification = document.createElement('div');
-                notification.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    padding: 16px 24px;
-                    border-radius: 12px;
-                    font-weight: 600;
-                    font-size: 15px;
-                    z-index: 10000;
-                    max-width: 90%;
-                    text-align: center;
-                    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-                    animation: slideDown 0.3s ease-out;
-                    transition: opacity 0.5s;
-                `;
-
-                const colors = {
-                    success: 'linear-gradient(135deg, #1a5a2a, #0a3a1a)',
-                    error: 'linear-gradient(135deg, #5a1a1a, #3a0a0a)',
-                    warning: 'linear-gradient(135deg, #5a4a1a, #3a2a0a)',
-                    info: 'linear-gradient(135deg, #1a2a5a, #0a1a3a)'
-                };
-
-                notification.style.background = colors[type] || colors.info;
-                notification.style.border = '1px solid #4a6a8a';
-                notification.style.color = '#fff';
-                notification.textContent = message;
-                document.body.appendChild(notification);
-
-                setTimeout(() => {
-                    notification.style.opacity = '0';
-                    setTimeout(() => {
-                        if (notification.parentNode) {
-                            notification.parentNode.removeChild(notification);
-                        }
-                    }, 500);
-                }, 5000);
-            }
+                isProcessing = false;
+                buyBtn.disabled = false;
+                buyBtn.textContent = '💰 Купить';
+            });
 
             // ===== ИНФО =====
             const infoModal = document.getElementById('infoModal');
@@ -1520,47 +1335,36 @@
                 const endRow = (row + 1) * 10;
                 const startCol = col * 10 + 1;
                 const endCol = (col + 1) * 10;
-                if (infoCoords) {
-                    infoCoords.textContent = '📍 Блок ' + (row + 1) + '×' + (col + 1) +
-                        ' (пиксели ' + startRow + '-' + endRow + ', ' + startCol + '-' + endCol + ')';
+                infoCoords.textContent = '📍 Блок ' + (row + 1) + '×' + (col + 1) +
+                    ' (пиксели ' + startRow + '-' + endRow + ', ' + startCol + '-' + endCol + ')';
+
+                if (data.image) {
+                    infoImage.innerHTML = '<img src="' + data.image + '" alt="Изображение" loading="lazy">';
+                } else {
+                    infoImage.innerHTML = '<span class="no-image">🖼 Нет изображения</span>';
                 }
 
-                if (infoImage) {
-                    if (data.image) {
-                        infoImage.innerHTML = '<img src="' + data.image + '" alt="Изображение" loading="lazy">';
-                    } else {
-                        infoImage.innerHTML = '<span class="no-image">🖼 Нет изображения</span>';
-                    }
+                infoSlogan.textContent = data.slogan || 'Без описания';
+
+                if (data.link && data.link !== '#') {
+                    infoLink.href = data.link;
+                    infoLink.style.display = 'inline-block';
+                    infoLink.textContent = '🔗 Перейти на сайт: ' + data.link;
+                } else {
+                    infoLink.style.display = 'none';
                 }
 
-                if (infoSlogan) infoSlogan.textContent = data.slogan || 'Без описания';
-
-                if (infoLink) {
-                    if (data.link && data.link !== '#') {
-                        infoLink.href = data.link;
-                        infoLink.style.display = 'inline-block';
-                        infoLink.textContent = '🔗 Перейти на сайт: ' + data.link;
-                    } else {
-                        infoLink.style.display = 'none';
-                    }
-                }
-
-                if (infoModal) infoModal.classList.add('active');
+                infoModal.classList.add('active');
             }
 
             function closeInfoModal() {
-                if (infoModal) infoModal.classList.remove('active');
+                infoModal.classList.remove('active');
             }
 
-            if (infoCloseBtn) {
-                infoCloseBtn.addEventListener('click', closeInfoModal);
-            }
-
-            if (infoModal) {
-                infoModal.addEventListener('click', function(e) {
-                    if (e.target === infoModal) closeInfoModal();
-                });
-            }
+            infoCloseBtn.addEventListener('click', closeInfoModal);
+            infoModal.addEventListener('click', function(e) {
+                if (e.target === infoModal) closeInfoModal();
+            });
 
             // ===== ОФЕРТА =====
             const offerModal = document.getElementById('offerModal');
@@ -1573,42 +1377,26 @@
                 offerFullText.innerHTML = offerTextEl.innerHTML;
             }
 
-            if (offerLink) {
-                offerLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    if (offerModal) offerModal.classList.add('active');
-                });
-            }
+            offerLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                offerModal.classList.add('active');
+            });
 
-            if (offerCloseBtn) {
-                offerCloseBtn.addEventListener('click', function() {
-                    if (offerModal) offerModal.classList.remove('active');
-                });
-            }
-
-            if (offerModal) {
-                offerModal.addEventListener('click', function(e) {
-                    if (e.target === offerModal) offerModal.classList.remove('active');
-                });
-            }
+            offerCloseBtn.addEventListener('click', function() {
+                offerModal.classList.remove('active');
+            });
+            offerModal.addEventListener('click', function(e) {
+                if (e.target === offerModal) offerModal.classList.remove('active');
+            });
 
             // ===== DONATIONALERTS =====
-            const donationLink = document.getElementById('donationLink');
-            const donationAlertBtn = document.getElementById('donationAlertBtn');
-            const DA_URL = 'https://www.donationalerts.com/r/rvdqs';
-
-            if (donationLink) {
-                donationLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    window.open(DA_URL, '_blank');
-                });
-            }
-
-            if (donationAlertBtn) {
-                donationAlertBtn.addEventListener('click', function() {
-                    window.open(DA_URL, '_blank');
-                });
-            }
+            document.getElementById('donationLink').addEventListener('click', function(e) {
+                e.preventDefault();
+                window.open(DA_URL, '_blank');
+            });
+            document.getElementById('donationAlertBtn').addEventListener('click', function() {
+                window.open(DA_URL, '_blank');
+            });
 
             // ===== РЕСАЙЗ =====
             let resizeTimer;
@@ -1622,40 +1410,21 @@
 
             // ===== ЗАПУСК =====
             async function init() {
-                console.log('🚀 Инициализация...');
+                console.log('🚀 Запуск Pixel Map с серверной синхронизацией...');
+                console.log('🌐 Сервер:', API_URL);
                 
-                try {
-                    console.log('📐 Ресайз Canvas...');
-                    resizeCanvas();
-                    
-                    console.log('📡 Загрузка данных с сервера...');
-                    await loadPixelsFromServer();
-                    
-                    console.log('🎯 Центрирование...');
-                    setTimeout(centerGrid, 50);
-                    
-                    console.log('🖼 Загрузка изображений...');
-                    loadBlockImages();
-                    
-                    console.log('🔍 Проверка возврата...');
-                    await checkPaymentReturn();
+                loadData();
+                resizeCanvas();
+                
+                await loadPixelsFromServer();
+                
+                setTimeout(centerGrid, 50);
+                loadBlockImages();
 
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const transactionId = urlParams.get('transaction');
-                    if (transactionId) {
-                        console.log('🔄 Активная транзакция:', transactionId);
-                        startTransactionCheck(transactionId);
-                    }
-
-                    console.log('✅ Pixel Map успешно загружен!');
-                    console.log('🌐 Сервер:', API_URL);
-                    console.log('📊 Продано блоков:', Object.keys(soldData).length);
-                } catch (error) {
-                    console.error('❌ Ошибка инициализации:', error);
-                }
+                console.log('✅ Готово!');
+                console.log('📊 Продано блоков:', Object.keys(soldData).length);
             }
 
-            // Запуск
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', init);
             } else {
