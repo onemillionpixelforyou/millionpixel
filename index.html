@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Pixel Map — покупка пикселей</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+        body {
+            background: #0a0a0f;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            padding: 20px;
+            overflow: hidden;
+            color: #ddd;
+        }
+        .container {
+            background: #12121a;
+            padding: 16px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.95);
+            width: 100%;
+            max-width: 1200px;
+            border: 1px solid #2a2a3a;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        h1 {
+            color: #f5c842;
+            font-size: 22px;
+            font-weight: 700;
+            text-shadow: 0 0 30px rgba(245, 200, 66, 0.1);
+        }
+        h1 small {
+            font-size: 12px;
+            color: #888;
+            font-weight: 400;
+            display: block;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .badge-rus {
+            background: #1a3a5a;
+            color: #7ec8f0;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            border: 1px solid #2a5a7a;
+        }
+        .badge-da {
+            background: #3a2a1a;
+            color: #f5a842;
+            border-color: #6a4a2a;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .badge-da:hover {
+            background: #5a3a2a;
+            transform: scale(1.05);
+        }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            color: #999;
+            font-size: 12px;
+            padding: 6px 14px;
+            background: #0d0d15;
+            border-radius: 10px;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-bottom: 10px;
+            border: 1px solid #1e1e2e;
+        }
+        .stats span {
+            color: #eee;
+            font-weight: 600;
+        }
+        .stats .stat-value {
+            color: #f5c842;
+        }
+        .controls-hint {
+            color: #555;
+            font-size: 11px;
+            text-align: center;
+            margin-bottom: 8px;
+            background: #0a0a12;
+            padding: 4px;
+            border-radius: 6px;
+            border: 1px solid #1a1a2a;
+        }
+        .controls-hint i {
+            font-style: normal;
+            display: inline-block;
+            margin: 0 6px;
+        }
+        .viewport {
+            width: 100%;
+            height: 600px;
+            overflow: hidden;
+            border: 2px solid #2a2a3a;
+            border-radius: 12px;
+            background: #08080e;
+            position: relative;
+            cursor: grab;
+            will-change: transform;
+        }
+        .viewport:active {
+            cursor: grabbing;
+        }
+        #pixel-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            image-rendering: pixelated;
+        }
+        .minimap {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 110px;
+            height: 110px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #2a2a3a;
+            border-radius: 8px;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0.4;
+            transition: opacity 0.3s;
+            will-change: transform;
+        }
+        .minimap:hover {
+            opacity: 0.9;
+        }
+        .minimap canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .footer {
+            margin-top: 8px;
+            color: #444;
+            font-size: 10px;
+            text-align: center;
+            border-top: 1px solid #1a1a2a;
+            padding-top: 8px;
+        }
+        .footer a {
+            color: #f5c842;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.92);
+            backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #12121a;
+            padding: 24px 28px;
+            border-radius: 16px;
+            width: 480px;
+            max-width: 95%;
+            color: #ddd;
+            border: 1px solid #2a2a3a;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.95);
+            max-height: 92vh;
+            overflow-y: auto;
+        }
+        .modal-content h2 {
+            color: #f5c842;
+            margin-bottom: 12px;
+            text-align: center;
+            font-size: 20px;
+        }
+        .modal-content label {
+            display: block;
+            margin: 10px 0 3px;
+            font-size: 12px;
+            color: #aaa;
+        }
+        .modal-content input,
+        .modal-content textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #2a2a3a;
+            background: #0a0a12;
+            color: #eee;
+            font-size: 13px;
+            outline: none;
+            font-family: inherit;
+        }
+        .modal-content input:focus,
+        .modal-content textarea:focus {
+            border-color: #f5c842;
+            box-shadow: 0 0 0 2px rgba(245, 200, 66, 0.1);
+        }
+        .modal-content textarea {
+            resize: vertical;
+            min-height: 50px;
+        }
+        .price-tag {
+            background: #0a0a12;
+            padding: 8px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 10px 0;
+            font-size: 20px;
+            color: #f5c842;
+            border: 1px solid #2a2a3a;
+            font-weight: 700;
+        }
+        .price-tag .currency {
+            color: #888;
+            font-weight: 400;
+            font-size: 14px;
+        }
+
+        /* НОВЫЙ БЛОК: выбор цвета с превью */
+        .color-picker-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #0a0a12;
+            padding: 6px 12px 6px 6px;
+            border-radius: 10px;
+            border: 1px solid #2a2a3a;
+            margin-top: 4px;
+        }
+        .color-picker-wrapper input[type="color"] {
+            width: 44px;
+            height: 44px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            padding: 0;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+        .color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        .color-picker-wrapper input[type="color"]::-webkit-color-swatch {
+            border: 2px solid #2a2a3a;
+            border-radius: 8px;
+        }
+        .color-picker-wrapper .color-hex {
+            font-size: 14px;
+            font-weight: 500;
+            color: #eee;
+            background: #0d0d15;
+            padding: 4px 12px;
+            border-radius: 6px;
+            border: 1px solid #1e1e2e;
+            font-family: monospace;
+            min-width: 80px;
+            text-align: center;
+        }
+        .color-preview-swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: 1px solid #2a2a3a;
+            flex-shrink: 0;
+            transition: background 0.1s;
+        }
+        .color-picker-wrapper .color-label {
+            color: #888;
+            font-size: 11px;
+            margin-right: auto;
+        }
+
+        .image-preview {
+            width: 100%;
+            height: 100px;
+            background: #0a0a12;
+            border-radius: 8px;
+            margin: 6px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px dashed #2a2a3a;
+        }
+        .image-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .image-preview .placeholder {
+            color: #555;
+            font-size: 11px;
+        }
+        .file-upload-wrapper {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+        .file-upload-wrapper input[type="file"] {
+            background: #0a0a12;
+            padding: 6px;
+            border-radius: 6px;
+            font-size: 11px;
+            flex: 1;
+            border: 1px solid #2a2a3a;
+            color: #aaa;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 14px;
+        }
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 14px;
+            flex: 1;
+            transition: 0.15s;
+        }
+        .btn-da {
+            background: #6a4a2a;
+            color: #f5c842;
+            border: 1px solid #8a6a4a;
+        }
+        .btn-da:hover {
+            background: #8a6a4a;
+            transform: scale(1.02);
+        }
+        .btn-da:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-cancel {
+            background: #2a2a3a;
+            color: #aaa;
+        }
+        .btn-cancel:hover {
+            background: #3a3a4a;
+            color: #fff;
+        }
+        .info-card {
+            background: #0a0a12;
+            border-radius: 12px;
+            border: 1px solid #2a2a3a;
+            overflow: hidden;
+        }
+        .info-card .card-image {
+            width: 100%;
+            height: 180px;
+            background: #0a0a12;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .info-card .card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .info-card .card-image .no-image {
+            color: #555;
+            font-size: 13px;
+        }
+        .info-card .card-body {
+            padding: 16px;
+        }
+        .info-card .card-body .card-coords {
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 6px;
+        }
+        .info-card .card-body .card-slogan {
+            color: #eee;
+            font-size: 17px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .info-card .card-body .card-link {
+            display: inline-block;
+            color: #f5c842;
+            text-decoration: none;
+            word-break: break-all;
+            font-size: 13px;
+        }
+        .info-card .card-body .card-link:hover {
+            text-decoration: underline;
+        }
+        .offer-box {
+            background: #0a0a12;
+            border: 1px solid #2a2a3a;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin: 8px 0;
+            max-height: 100px;
+            overflow-y: auto;
+            font-size: 10px;
+            line-height: 1.5;
+            color: #777;
+        }
+        .offer-box strong {
+            color: #aaa;
+        }
+        .offer-box .highlight {
+            color: #ff6b6b;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 6px 0;
+            padding: 6px 10px;
+            background: #0a0a12;
+            border-radius: 8px;
+            border: 1px solid #1a1a2a;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            margin-top: 2px;
+            accent-color: #f5c842;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .checkbox-group label {
+            font-size: 11px;
+            color: #999;
+            cursor: pointer;
+            margin: 0;
+            line-height: 1.3;
+        }
+        .checkbox-group label strong {
+            color: #ddd;
+        }
+        .selection-hint {
+            background: #1a1a2a;
+            border: 1px solid #f5c842;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 11px;
+            color: #f5c842;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+            min-height: 30px;
+        }
+        .selection-hint .selected-count {
+            color: #fff;
+            font-weight: 700;
+        }
+        .selection-hint .clear-btn {
+            background: #2a2a3a;
+            border: none;
+            color: #ff6b6b;
+            padding: 2px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+        }
+        .selection-hint .clear-btn:hover {
+            background: #3a2a2a;
+        }
+        .offer-section-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #1a1a2a;
+            color: #666;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .offer-section-title span {
+            color: #f5c842;
+        }
+        @media (max-width: 768px) {
+            .viewport {
+                height: 420px;
+            }
+            .stats {
+                font-size: 10px;
+                padding: 4px 10px;
+            }
+            .modal-content {
+                padding: 16px;
+            }
+            .minimap {
+                width: 70px;
+                height: 70px;
+                bottom: 5px;
+                right: 5px;
+            }
+            h1 {
+                font-size: 18px;
+            }
+            .info-card .card-image {
+                height: 130px;
+            }
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .header-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+        @media (max-width: 480px) {
+            .modal-content {
+                padding: 12px;
+            }
+            .offer-box {
+                max-height: 70px;
+                font-size: 9px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>
+                🇷🇺 Пиксельная Карта
+                <small>1000 × 1000 пикселей</small>
+            </h1>
+            <div class="header-right">
+                <span class="badge-rus badge-da" id="donationAlertBtn">🎁 DonationAlerts</span>
+                <span class="badge-rus" style="background:#1a3a2a;color:#7af0a0;">📜 Оферта</span>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div>📦 <span id="total-pixels">1 000 000</span></div>
+            <div>🟢 <span id="free-pixels">0</span></div>
+            <div>🔴 <span id="sold-pixels">0</span></div>
+            <div>💰 <span class="stat-value" id="earned">0</span> ₽</div>
+            <div>🔎 <span id="zoom-level">100%</span></div>
+        </div>
+
+        <div class="controls-hint">
+            <i>🖱 Перетащи</i> · <i>🔍 Колесико — масштаб</i> · <i>👆 Клик — инфо</i> · <i>🟡 Выделяй блоки</i>
+        </div>
+
+        <div class="selection-hint" id="selectionHint" style="display:none;">
+            <span>🟡 Выделено: <span class="selected-count" id="selectedCount">0</span> блоков</span>
+            <span style="color:#888;">(всего <span id="selectedPixelsCount">0</span> пикселей)</span>
+            <span style="color:#888;">💰 <span id="selectedPrice">0</span> ₽</span>
+            <button class="clear-btn" id="clearSelectionBtn">✕ Очистить</button>
+            <button class="btn-da" style="padding:2px 16px;font-size:11px;flex:0 0 auto;" id="buySelectedBtn">Купить выбранное</button>
+        </div>
+
+        <div class="viewport" id="viewport">
+            <canvas id="pixel-canvas"></canvas>
+            <div class="minimap" id="minimap">
+                <canvas id="minimapCanvas"></canvas>
+            </div>
+        </div>
+
+        <div class="footer">
+            ⚡ 1 пиксель = 1 ₽ • блок 10×10 = 100 ₽ •
+            <a id="offerLink">Оферта</a> •
+            <a id="donationLink">DonationAlerts</a>
+        </div>
+    </div>
+
+    <!-- ===== МОДАЛКИ ===== -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h2 id="modalTitle">🏷️ Купить блоки</h2>
+            <div class="price-tag" id="modalPriceDisplay">
+                <span id="priceAmount">0</span> <span class="currency">₽</span>
+            </div>
+
+            <!-- === НОВЫЙ ВЫБОР ЦВЕТА С ОТОБРАЖЕНИЕМ === -->
+            <label>🎨 Цвет фона:</label>
+            <div class="color-picker-wrapper">
+                <input type="color" id="colorInput" value="#2a4a7a">
+                <div class="color-preview-swatch" id="colorSwatch" style="background:#2a4a7a;"></div>
+                <span class="color-hex" id="colorHexDisplay">#2a4a7a</span>
+                <span class="color-label">выбранный</span>
+            </div>
+
+            <label>🖼 Изображение (URL или файл):</label>
+            <input type="text" id="imageUrlInput" placeholder="https://..." value="">
+            <div class="file-upload-wrapper">
+                <input type="file" id="imageFileInput" accept="image/*">
+                <span style="color:#555; font-size:10px;">или файл</span>
+            </div>
+            <div class="image-preview" id="imagePreview">
+                <span class="placeholder">🖼 Предпросмотр</span>
+            </div>
+
+            <label>🔗 Ссылка на сайт:</label>
+            <input type="text" id="linkInput" value="https://example.com">
+
+            <label>💬 Слоган:</label>
+            <textarea id="sloganInput" rows="2">Мой блок</textarea>
+
+            <div class="offer-section-title">
+                <span>📜</span> ПУБЛИЧНАЯ ОФЕРТА
+            </div>
+            <div class="offer-box" id="offerText">
+                <p><strong>1. Общие положения</strong><br>
+                Настоящая оферта является официальным предложением Администрации сайта (далее — «Продавец») любому физическому или юридическому лицу (далее — «Покупатель») заключить договор купли-продажи рекламных пикселей на условиях, изложенных ниже.</p>
+                <p><strong>2. Предмет договора</strong><br>
+                Продавец обязуется предоставить Покупателю право размещения рекламной информации (изображение, слоган, гиперссылка) на выбранном блоке пикселей размером 10×10 (100 пикселей) на главной странице сайта <strong>на срок 5 лет</strong> с момента оплаты.</p>
+                <p><strong>3. Порядок оплаты</strong><br>
+                3.1. Стоимость одного пикселя составляет <strong>1 рубль</strong>.<br>
+                3.2. Минимальный заказ — блок 10×10 пикселей (100 ₽).<br>
+                3.3. Оплата через <strong>DonationAlerts</strong>.</p>
+                <p><strong>4. Отказ от возврата денежных средств</strong><br>
+                Все платежи являются безвозвратными. Покупатель подтверждает, что понимает цифровой характер товара, ознакомился с визуальным представлением сетки, согласен с расположением блока, и что технические ограничения не являются основанием для возврата.</p>
+                <p><strong>5. Ответственность Покупателя</strong><br>
+                5.1. Покупатель несёт полную ответственность за содержание размещаемой информации.<br>
+                5.2. Запрещено размещение материалов, нарушающих законодательство РФ.<br>
+                5.3. В случае нарушения администрация оставляет за собой право <strong>удалить блок без возврата средств</strong>.</p>
+                <p><strong>6. Принятие условий</strong><br>
+                Нажимая кнопку «Купить», Покупатель <strong>безусловно принимает</strong> все условия оферты.</p>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="agreeCheckbox">
+                <label for="agreeCheckbox">
+                    <strong>Я ознакомился с офертой</strong> и принимаю её условия.
+                </label>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-cancel" id="cancelBtn">Отмена</button>
+                <button class="btn btn-da" id="buyBtn" disabled>💰 Купить</button>
+            </div>
+            <div style="text-align:center; margin-top:6px; font-size:10px; color:#555;">
+                🔒 После оплаты — автоматический возврат на сайт
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="infoModal">
+        <div class="modal-content" style="border-color:#2a4a7a; max-width:460px;">
+            <div class="info-card">
+                <div class="card-image" id="infoImage">
+                    <span class="no-image">🖼 Нет изображения</span>
+                </div>
+                <div class="card-body">
+                    <div class="card-coords" id="infoCoords">📍 Блок: 0, 0</div>
+                    <div class="card-slogan" id="infoSlogan">Без описания</div>
+                    <a href="#" class="card-link" id="infoLink" target="_blank">🔗 Перейти на сайт</a>
+                    <div style="margin-top:12px; padding-top:12px; border-top:1px solid #1a1a2a;">
+                        <button class="btn btn-cancel" id="infoCloseBtn" style="width:100%;">Закрыть</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="offerModal">
+        <div class="modal-content" style="max-width:600px;">
+            <h2>📜 Публичная оферта</h2>
+            <div class="offer-box" style="max-height:400px; font-size:12px;" id="offerFullText"></div>
+            <div style="margin-top:12px;">
+                <button class="btn btn-cancel" id="offerCloseBtn" style="width:100%;">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ===== КОНФИГ =====
+            const GRID_SIZE = 1000;
+            const BLOCK_SIZE = 10;
+            const BLOCK_PIXELS = BLOCK_SIZE * BLOCK_SIZE;
+            const PRICE_PER_PIXEL = 1;
+            const BLOCKS_PER_ROW = GRID_SIZE / BLOCK_SIZE;
+            const DA_URL = 'https://www.donationalerts.com/r/rvdqs';
+
+            // ===== СОСТОЯНИЕ =====
+            let soldData = {};
+            let pendingBlocks = [];
+            let selectedBlocks = new Set();
+
+            // ===== ЗАГРУЗКА / СОХРАНЕНИЕ =====
+            function loadData() {
+                try {
+                    const saved = localStorage.getItem('pixelGridData');
+                    if (saved) {
+                        try {
+                            soldData = JSON.parse(saved);
+                        } catch (e) {
+                            soldData = {};
+                        }
+                        if (typeof soldData !== 'object' || Array.isArray(soldData)) soldData = {};
+                    }
+                } catch (e) { soldData = {}; }
+            }
+
+            function saveData() {
+                try {
+                    localStorage.setItem('pixelGridData', JSON.stringify(soldData));
+                } catch (e) {
+                    if (e.name === 'QuotaExceededError') {
+                        alert('⚠️ Хранилище переполнено. Удалите старые блоки.');
+                    }
+                }
+            }
+
+            function getBlockId(row, col) { return row + '_' + col; }
+
+            function isSold(row, col) { return !!soldData[getBlockId(row, col)]; }
+
+            function getBlockData(row, col) { return soldData[getBlockId(row, col)] || null; }
+
+            // ===== CANVAS РЕНДЕРИНГ =====
+            const canvas = document.getElementById('pixel-canvas');
+            const ctx = canvas.getContext('2d');
+            const viewport = document.getElementById('viewport');
+
+            const BLOCK_RENDER_SIZE = 10;
+
+            function getCanvasSize() {
+                const rect = viewport.getBoundingClientRect();
+                return { width: rect.width, height: rect.height };
+            }
+
+            let canvasWidth = 0,
+                canvasHeight = 0;
+            let scale = 1;
+            let translateX = 0,
+                translateY = 0;
+
+            function resizeCanvas() {
+                const size = getCanvasSize();
+                const dpr = window.devicePixelRatio || 1;
+                canvasWidth = size.width * dpr;
+                canvasHeight = size.height * dpr;
+                canvas.width = canvasWidth;
+                canvas.height = canvasHeight;
+                canvas.style.width = size.width + 'px';
+                canvas.style.height = size.height + 'px';
+                ctx.scale(dpr, dpr);
+                canvasWidth = size.width;
+                canvasHeight = size.height;
+            }
+
+            function render() {
+                const w = canvasWidth;
+                const h = canvasHeight;
+
+                ctx.fillStyle = '#08080e';
+                ctx.fillRect(0, 0, w, h);
+
+                const blockSize = BLOCK_RENDER_SIZE * scale;
+
+                const startX = -translateX / scale;
+                const startY = -translateY / scale;
+                const endX = startX + w / scale;
+                const endY = startY + h / scale;
+
+                const colStart = Math.max(0, Math.floor(startX / BLOCK_RENDER_SIZE));
+                const colEnd = Math.min(BLOCKS_PER_ROW, Math.ceil(endX / BLOCK_RENDER_SIZE) + 1);
+                const rowStart = Math.max(0, Math.floor(startY / BLOCK_RENDER_SIZE));
+                const rowEnd = Math.min(BLOCKS_PER_ROW, Math.ceil(endY / BLOCK_RENDER_SIZE) + 1);
+
+                for (let row = rowStart; row < rowEnd; row++) {
+                    for (let col = colStart; col < colEnd; col++) {
+                        const x = col * blockSize + translateX;
+                        const y = row * blockSize + translateY;
+
+                        const id = getBlockId(row, col);
+                        const data = getBlockData(row, col);
+                        const isSelected = selectedBlocks.has(id);
+
+                        if (data) {
+                            ctx.fillStyle = data.color || '#2a4a7a';
+                            ctx.fillRect(x, y, blockSize, blockSize);
+
+                            if (data.image && data._imgLoaded) {
+                                try {
+                                    const img = data._img;
+                                    if (img && img.complete && img.naturalWidth > 0) {
+                                        ctx.drawImage(img, x, y, blockSize, blockSize);
+                                    }
+                                } catch (e) {}
+                            }
+
+                            ctx.strokeStyle = '#2a2a3a';
+                            ctx.lineWidth = 0.5;
+                            ctx.strokeRect(x, y, blockSize, blockSize);
+
+                            if (scale > 0.8 && data.slogan) {
+                                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                                ctx.font = (blockSize * 0.3) + 'px sans-serif';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                const label = data.slogan.length > 4 ? data.slogan.slice(0, 4) + '…' : data.slogan;
+                                ctx.fillText(label, x + blockSize / 2, y + blockSize / 2);
+                            }
+                        } else {
+                            ctx.fillStyle = isSelected ? '#2a4a2a' : '#1a1a24';
+                            ctx.fillRect(x, y, blockSize, blockSize);
+
+                            ctx.strokeStyle = isSelected ? '#4a7a4a' : '#252535';
+                            ctx.lineWidth = isSelected ? 1 : 0.5;
+                            ctx.strokeRect(x, y, blockSize, blockSize);
+
+                            if (isSelected && scale > 0.5) {
+                                ctx.fillStyle = 'rgba(245, 200, 66, 0.15)';
+                                ctx.fillRect(x, y, blockSize, blockSize);
+                            }
+                        }
+                    }
+                }
+
+                updateStats();
+                updateSelectionUI();
+                updateMinimap();
+            }
+
+            const imageCache = {};
+
+            function loadBlockImages() {
+                let loadedCount = 0;
+                const total = Object.keys(soldData).length;
+
+                for (const id in soldData) {
+                    const data = soldData[id];
+                    if (data.image && !data._imgLoaded) {
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+                        img.onload = function() {
+                            data._img = img;
+                            data._imgLoaded = true;
+                            loadedCount++;
+                            if (loadedCount % 10 === 0 || loadedCount === total) {
+                                render();
+                            }
+                        };
+                        img.onerror = function() {
+                            data._imgLoaded = false;
+                            loadedCount++;
+                            if (loadedCount === total) render();
+                        };
+                        img.src = data.image;
+                    }
+                }
+            }
+
+            // ===== СТАТИСТИКА =====
+            function updateStats() {
+                const total = GRID_SIZE * GRID_SIZE;
+                const soldCount = Object.keys(soldData).length;
+                const soldPixels = soldCount * BLOCK_PIXELS;
+                const freePixels = total - soldPixels;
+                const earned = soldPixels * PRICE_PER_PIXEL;
+
+                document.getElementById('total-pixels').textContent = total.toLocaleString('ru-RU');
+                document.getElementById('free-pixels').textContent = freePixels.toLocaleString('ru-RU');
+                document.getElementById('sold-pixels').textContent = soldPixels.toLocaleString('ru-RU');
+                document.getElementById('earned').textContent = earned.toLocaleString('ru-RU');
+                document.getElementById('zoom-level').textContent = Math.round(scale * 100) + '%';
+            }
+
+            // ===== ПАНОРАМИРОВАНИЕ И МАСШТАБ =====
+            let isDragging = false;
+            let isClick = false;
+            let startX = 0,
+                startY = 0;
+            let startTranslateX = 0,
+                startTranslateY = 0;
+            const DRAG_THRESHOLD = 5;
+
+            function updateTransform() {
+                render();
+            }
+
+            function centerGrid() {
+                const w = canvasWidth;
+                const h = canvasHeight;
+                const gridW = BLOCKS_PER_ROW * BLOCK_RENDER_SIZE;
+                const gridH = BLOCKS_PER_ROW * BLOCK_RENDER_SIZE;
+                const scX = (w - 40) / gridW;
+                const scY = (h - 40) / gridH;
+                scale = Math.min(scX, scY, 1.5);
+                translateX = (w - gridW * scale) / 2;
+                translateY = (h - gridH * scale) / 2;
+                updateTransform();
+            }
+
+            viewport.addEventListener('mousedown', function(e) {
+                if (e.button !== 0) return;
+                const rect = canvas.getBoundingClientRect();
+                startX = e.clientX - rect.left;
+                startY = e.clientY - rect.top;
+                startTranslateX = translateX;
+                startTranslateY = translateY;
+                isDragging = false;
+                isClick = true;
+                viewport.style.cursor = 'grabbing';
+            });
+
+            window.addEventListener('mousemove', function(e) {
+                if (!isClick) return;
+                const rect = canvas.getBoundingClientRect();
+                const dx = e.clientX - rect.left - startX;
+                const dy = e.clientY - rect.top - startY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > DRAG_THRESHOLD) {
+                    isDragging = true;
+                    viewport.style.cursor = 'grabbing';
+                }
+
+                if (isDragging) {
+                    translateX = startTranslateX + dx;
+                    translateY = startTranslateY + dy;
+                    updateTransform();
+                }
+            });
+
+            window.addEventListener('mouseup', function() {
+                isClick = false;
+                isDragging = false;
+                viewport.style.cursor = 'grab';
+            });
+
+            let wheelTimeout = null;
+            viewport.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                if (wheelTimeout) return;
+
+                const delta = e.deltaY > 0 ? -0.08 : 0.08;
+                const oldScale = scale;
+                scale = Math.min(Math.max(scale + delta, 0.15), 5);
+
+                const rect = canvas.getBoundingClientRect();
+                const cx = e.clientX - rect.left;
+                const cy = e.clientY - rect.top;
+                const ratio = scale / oldScale;
+                translateX = cx - (cx - translateX) * ratio;
+                translateY = cy - (cy - translateY) * ratio;
+
+                wheelTimeout = setTimeout(function() {
+                    wheelTimeout = null;
+                }, 50);
+
+                updateTransform();
+            }, { passive: false });
+
+            viewport.addEventListener('dblclick', function() {
+                centerGrid();
+            });
+
+            // ===== КЛИКИ ПО БЛОКАМ =====
+            function getBlockAt(x, y) {
+                const bx = (x - translateX) / (BLOCK_RENDER_SIZE * scale);
+                const by = (y - translateY) / (BLOCK_RENDER_SIZE * scale);
+                const col = Math.floor(bx);
+                const row = Math.floor(by);
+                if (row >= 0 && row < BLOCKS_PER_ROW && col >= 0 && col < BLOCKS_PER_ROW) {
+                    return { row, col };
+                }
+                return null;
+            }
+
+            canvas.addEventListener('click', function(e) {
+                if (isDragging) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const block = getBlockAt(x, y);
+                if (!block) return;
+
+                const { row, col } = block;
+                const id = getBlockId(row, col);
+
+                if (isSold(row, col)) {
+                    openInfoModal(row, col);
+                } else {
+                    toggleSelection(row, col);
+                }
+            });
+
+            // ===== ВЫДЕЛЕНИЕ =====
+            function toggleSelection(row, col) {
+                const id = getBlockId(row, col);
+                if (isSold(row, col)) return;
+
+                if (selectedBlocks.has(id)) {
+                    selectedBlocks.delete(id);
+                } else {
+                    selectedBlocks.add(id);
+                }
+                render();
+            }
+
+            function clearSelection() {
+                selectedBlocks.clear();
+                render();
+            }
+
+            function updateSelectionUI() {
+                const hint = document.getElementById('selectionHint');
+                const count = selectedBlocks.size;
+                const pixels = count * BLOCK_PIXELS;
+                const price = pixels * PRICE_PER_PIXEL;
+
+                if (count === 0) {
+                    hint.style.display = 'none';
+                    return;
+                }
+
+                hint.style.display = 'flex';
+                document.getElementById('selectedCount').textContent = count;
+                document.getElementById('selectedPixelsCount').textContent = pixels.toLocaleString('ru-RU');
+                document.getElementById('selectedPrice').textContent = price.toLocaleString('ru-RU');
+            }
+
+            document.getElementById('clearSelectionBtn').addEventListener('click', clearSelection);
+            document.getElementById('buySelectedBtn').addEventListener('click', function() {
+                if (selectedBlocks.size === 0) return;
+                openBulkEditModal();
+            });
+
+            // ===== МИНИ-КАРТА =====
+            const minimapCanvas = document.getElementById('minimapCanvas');
+            const minimapCtx = minimapCanvas.getContext('2d');
+
+            function updateMinimap() {
+                const canvas = minimapCanvas;
+                const rect = canvas.parentElement.getBoundingClientRect();
+                const size = Math.min(rect.width, rect.height);
+
+                canvas.width = size;
+                canvas.height = size;
+
+                const ctx = minimapCtx;
+                ctx.clearRect(0, 0, size, size);
+                ctx.fillStyle = '#0a0a12';
+                ctx.fillRect(0, 0, size, size);
+
+                const blockSize = size / BLOCKS_PER_ROW;
+
+                for (let row = 0; row < BLOCKS_PER_ROW; row++) {
+                    for (let col = 0; col < BLOCKS_PER_ROW; col++) {
+                        const data = getBlockData(row, col);
+                        const id = getBlockId(row, col);
+                        if (selectedBlocks.has(id)) {
+                            ctx.fillStyle = '#4a7a4a';
+                        } else {
+                            ctx.fillStyle = data ? data.color : '#1a1a24';
+                        }
+                        ctx.fillRect(col * blockSize, row * blockSize, blockSize + 0.5, blockSize + 0.5);
+                    }
+                }
+
+                const vRect = viewport.getBoundingClientRect();
+                const visX = -translateX / (BLOCKS_PER_ROW * BLOCK_RENDER_SIZE * scale) * size;
+                const visY = -translateY / (BLOCKS_PER_ROW * BLOCK_RENDER_SIZE * scale) * size;
+                const visW = (vRect.width / (BLOCKS_PER_ROW * BLOCK_RENDER_SIZE * scale)) * size;
+                const visH = (vRect.height / (BLOCKS_PER_ROW * BLOCK_RENDER_SIZE * scale)) * size;
+
+                ctx.strokeStyle = 'rgba(245, 200, 66, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(visX, visY, visW, visH);
+            }
+
+            // ===== МОДАЛКИ =====
+            const editModal = document.getElementById('editModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const priceAmount = document.getElementById('priceAmount');
+            const colorInput = document.getElementById('colorInput');
+            const colorSwatch = document.getElementById('colorSwatch');
+            const colorHexDisplay = document.getElementById('colorHexDisplay');
+            const imageUrlInput = document.getElementById('imageUrlInput');
+            const imageFileInput = document.getElementById('imageFileInput');
+            const imagePreview = document.getElementById('imagePreview');
+            const linkInput = document.getElementById('linkInput');
+            const sloganInput = document.getElementById('sloganInput');
+            const agreeCheckbox = document.getElementById('agreeCheckbox');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const buyBtn = document.getElementById('buyBtn');
+
+            // === ОТОБРАЖЕНИЕ ВЫБРАННОГО ЦВЕТА ===
+            function updateColorDisplay(hex) {
+                if (!hex.startsWith('#')) hex = '#' + hex;
+                colorSwatch.style.background = hex;
+                colorHexDisplay.textContent = hex.toUpperCase();
+            }
+
+            colorInput.addEventListener('input', function() {
+                updateColorDisplay(this.value);
+            });
+
+            // === ПРЕДПРОСМОТР ИЗОБРАЖЕНИЙ ===
+            function previewImage(src) {
+                if (src && src.trim() !== '') {
+                    imagePreview.innerHTML = '<img src="' + src + '" alt="Предпросмотр" loading="lazy">';
+                } else {
+                    imagePreview.innerHTML = '<span class="placeholder">🖼 Предпросмотр</span>';
+                }
+            }
+
+            let previewTimeout = null;
+            imageUrlInput.addEventListener('input', function() {
+                clearTimeout(previewTimeout);
+                previewTimeout = setTimeout(function() {
+                    previewImage(imageUrlInput.value);
+                }, 200);
+            });
+
+            imageFileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const dataUrl = event.target.result;
+                        imageUrlInput.value = dataUrl;
+                        previewImage(dataUrl);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // === ОТКРЫТИЕ МОДАЛКИ ===
+            function openBulkEditModal() {
+                const count = selectedBlocks.size;
+                const pixels = count * BLOCK_PIXELS;
+                const price = pixels * PRICE_PER_PIXEL;
+
+                modalTitle.textContent = '🏷️ Купить ' + count + ' блоков';
+                priceAmount.textContent = price.toLocaleString('ru-RU');
+
+                const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+                colorInput.value = randomColor;
+                updateColorDisplay(randomColor);
+
+                imageUrlInput.value = '';
+                previewImage('');
+                linkInput.value = 'https://example.com';
+                sloganInput.value = 'Блок ' + count + 'шт';
+                buyBtn.textContent = '💰 Купить за ' + price + ' ₽';
+                buyBtn.disabled = true;
+                agreeCheckbox.checked = false;
+
+                editModal.classList.add('active');
+            }
+
+            function closeEditModal() {
+                editModal.classList.remove('active');
+                imageFileInput.value = '';
+                pendingBlocks = [];
+            }
+
+            agreeCheckbox.addEventListener('change', function() {
+                buyBtn.disabled = !this.checked;
+            });
+
+            cancelBtn.addEventListener('click', closeEditModal);
+            editModal.addEventListener('click', function(e) {
+                if (e.target === editModal) closeEditModal();
+            });
+
+            // ===== ПОКУПКА =====
+            buyBtn.addEventListener('click', function() {
+                if (!agreeCheckbox.checked) {
+                    alert('⚠️ Примите условия оферты.');
+                    return;
+                }
+
+                const blocks = [...selectedBlocks];
+                if (blocks.length === 0) return;
+
+                const color = colorInput.value.trim() || '#2a4a7a';
+                const image = imageUrlInput.value.trim() || '';
+                const link = linkInput.value.trim() || '#';
+                const slogan = sloganInput.value.trim() || 'Без описания';
+
+                const price = blocks.length * BLOCK_PIXELS * PRICE_PER_PIXEL;
+
+                pendingBlocks = blocks.map(id => {
+                    const [row, col] = id.split('_').map(Number);
+                    return { row, col, color, image, link, slogan };
+                });
+
+                const returnUrl = window.location.href.split('?')[0] + '?payment=success&blocks=' + blocks.join(',');
+                const daUrl = DA_URL +
+                    '?amount=' + encodeURIComponent(price) +
+                    '&currency=RUB' +
+                    '&message=' + encodeURIComponent('Оплата ' + blocks.length + ' блоков') +
+                    '&return_url=' + encodeURIComponent(returnUrl);
+
+                const daWindow = window.open(daUrl, '_blank');
+
+                if (!daWindow) {
+                    alert('⚠️ Разрешите всплывающие окна.');
+                    return;
+                }
+
+                closeEditModal();
+                checkBulkPayment(blocks);
+            });
+
+            function checkBulkPayment(blocks) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const paymentStatus = urlParams.get('payment');
+                const blocksParam = urlParams.get('blocks');
+
+                if (paymentStatus === 'success' && blocksParam) {
+                    const paidBlocks = blocksParam.split(',');
+                    const allMatch = blocks.every(id => paidBlocks.includes(id));
+
+                    if (allMatch && pendingBlocks.length > 0) {
+                        pendingBlocks.forEach(data => {
+                            const id = getBlockId(data.row, data.col);
+                            soldData[id] = {
+                                color: data.color,
+                                image: data.image,
+                                link: data.link,
+                                slogan: data.slogan
+                            };
+                        });
+                        saveData();
+                        selectedBlocks.clear();
+                        pendingBlocks = [];
+                        loadBlockImages();
+                        render();
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        alert('✅ Оплата успешна! ' + blocks.length + ' блоков активированы.');
+                    }
+                }
+            }
+
+            function checkInitialPayment() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const paymentStatus = urlParams.get('payment');
+                const blocksParam = urlParams.get('blocks');
+
+                if (paymentStatus === 'success' && blocksParam && pendingBlocks.length > 0) {
+                    const paidBlocks = blocksParam.split(',');
+                    const allMatch = pendingBlocks.every(data => paidBlocks.includes(getBlockId(data.row, data.col)));
+
+                    if (allMatch) {
+                        pendingBlocks.forEach(data => {
+                            const id = getBlockId(data.row, data.col);
+                            soldData[id] = {
+                                color: data.color,
+                                image: data.image,
+                                link: data.link,
+                                slogan: data.slogan
+                            };
+                        });
+                        saveData();
+                        selectedBlocks.clear();
+                        pendingBlocks = [];
+                        loadBlockImages();
+                        render();
+                        alert('✅ Оплата подтверждена! Все блоки активированы.');
+                    }
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }
+
+            // ===== ИНФО =====
+            const infoModal = document.getElementById('infoModal');
+            const infoImage = document.getElementById('infoImage');
+            const infoCoords = document.getElementById('infoCoords');
+            const infoSlogan = document.getElementById('infoSlogan');
+            const infoLink = document.getElementById('infoLink');
+            const infoCloseBtn = document.getElementById('infoCloseBtn');
+
+            function openInfoModal(row, col) {
+                const data = getBlockData(row, col);
+                if (!data) {
+                    alert('Информация не найдена.');
+                    return;
+                }
+
+                const startRow = row * 10 + 1;
+                const endRow = (row + 1) * 10;
+                const startCol = col * 10 + 1;
+                const endCol = (col + 1) * 10;
+                infoCoords.textContent = '📍 Блок ' + (row + 1) + '×' + (col + 1) +
+                    ' (пиксели ' + startRow + '-' + endRow + ', ' + startCol + '-' + endCol + ')';
+
+                if (data.image) {
+                    infoImage.innerHTML = '<img src="' + data.image + '" alt="Изображение" loading="lazy">';
+                } else {
+                    infoImage.innerHTML = '<span class="no-image">🖼 Нет изображения</span>';
+                }
+
+                infoSlogan.textContent = data.slogan || 'Без описания';
+
+                if (data.link && data.link !== '#') {
+                    infoLink.href = data.link;
+                    infoLink.style.display = 'inline-block';
+                    infoLink.textContent = '🔗 Перейти на сайт: ' + data.link;
+                } else {
+                    infoLink.style.display = 'none';
+                }
+
+                infoModal.classList.add('active');
+            }
+
+            function closeInfoModal() {
+                infoModal.classList.remove('active');
+            }
+
+            infoCloseBtn.addEventListener('click', closeInfoModal);
+            infoModal.addEventListener('click', function(e) {
+                if (e.target === infoModal) closeInfoModal();
+            });
+
+            // ===== ОФЕРТА =====
+            const offerModal = document.getElementById('offerModal');
+            const offerLink = document.getElementById('offerLink');
+            const offerCloseBtn = document.getElementById('offerCloseBtn');
+            const offerFullText = document.getElementById('offerFullText');
+
+            const offerTextEl = document.getElementById('offerText');
+            if (offerTextEl && offerFullText) {
+                offerFullText.innerHTML = offerTextEl.innerHTML;
+            }
+
+            offerLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                offerModal.classList.add('active');
+            });
+
+            offerCloseBtn.addEventListener('click', function() {
+                offerModal.classList.remove('active');
+            });
+            offerModal.addEventListener('click', function(e) {
+                if (e.target === offerModal) offerModal.classList.remove('active');
+            });
+
+            // ===== DONATIONALERTS =====
+            document.getElementById('donationLink').addEventListener('click', function(e) {
+                e.preventDefault();
+                window.open(DA_URL, '_blank');
+            });
+            document.getElementById('donationAlertBtn').addEventListener('click', function() {
+                window.open(DA_URL, '_blank');
+            });
+
+            // ===== РЕСАЙЗ =====
+            let resizeTimer;
+            window.addEventListener('resize', function() {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(function() {
+                    resizeCanvas();
+                    centerGrid();
+                }, 100);
+            });
+
+            // ===== ЗАПУСК =====
+            loadData();
+            resizeCanvas();
+
+            setTimeout(function() {
+                centerGrid();
+                loadBlockImages();
+            }, 50);
+
+            checkInitialPayment();
+
+            console.log('⚡ Pixel Map на Canvas. Производительность оптимизирована.');
+            console.log('📊 Продано блоков:', Object.keys(soldData).length);
+
+        })();
+    </script>
+
+</body>
+</html>
