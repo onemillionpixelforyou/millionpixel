@@ -250,8 +250,6 @@
             font-weight: 400;
             font-size: 14px;
         }
-
-        /* НОВЫЙ БЛОК: выбор цвета с превью */
         .color-picker-wrapper {
             display: flex;
             align-items: center;
@@ -304,7 +302,6 @@
             font-size: 11px;
             margin-right: auto;
         }
-
         .image-preview {
             width: 100%;
             height: 100px;
@@ -616,7 +613,6 @@
                 <span id="priceAmount">0</span> <span class="currency">₽</span>
             </div>
 
-            <!-- === НОВЫЙ ВЫБОР ЦВЕТА С ОТОБРАЖЕНИЕМ === -->
             <label>🎨 Цвет фона:</label>
             <div class="color-picker-wrapper">
                 <input type="color" id="colorInput" value="#2a4a7a">
@@ -720,10 +716,14 @@
             const BLOCKS_PER_ROW = GRID_SIZE / BLOCK_SIZE;
             const DA_URL = 'https://www.donationalerts.com/r/rvdqs';
 
+            // ===== АДРЕС СЕРВЕРА НА RENDER =====
+            const API_URL = 'https://pixel-map-server-lbfs.onrender.com';
+
             // ===== СОСТОЯНИЕ =====
             let soldData = {};
-            let pendingBlocks = [];
             let selectedBlocks = new Set();
+            let currentTransactionId = null;
+            let transactionCheckInterval = null;
 
             // ===== ЗАГРУЗКА / СОХРАНЕНИЕ =====
             function loadData() {
@@ -862,8 +862,6 @@
                 updateMinimap();
             }
 
-            const imageCache = {};
-
             function loadBlockImages() {
                 let loadedCount = 0;
                 const total = Object.keys(soldData).length;
@@ -906,7 +904,7 @@
                 document.getElementById('zoom-level').textContent = Math.round(scale * 100) + '%';
             }
 
-            // ===== ПАНОРАМИРОВАНИЕ И МАСШТАБ =====
+            // ===== ПАНОРАМИРОВАНИЕ =====
             let isDragging = false;
             let isClick = false;
             let startX = 0,
@@ -1127,7 +1125,6 @@
             const cancelBtn = document.getElementById('cancelBtn');
             const buyBtn = document.getElementById('buyBtn');
 
-            // === ОТОБРАЖЕНИЕ ВЫБРАННОГО ЦВЕТА ===
             function updateColorDisplay(hex) {
                 if (!hex.startsWith('#')) hex = '#' + hex;
                 colorSwatch.style.background = hex;
@@ -1138,7 +1135,6 @@
                 updateColorDisplay(this.value);
             });
 
-            // === ПРЕДПРОСМОТР ИЗОБРАЖЕНИЙ ===
             function previewImage(src) {
                 if (src && src.trim() !== '') {
                     imagePreview.innerHTML = '<img src="' + src + '" alt="Предпросмотр" loading="lazy">';
@@ -1168,7 +1164,6 @@
                 }
             });
 
-            // === ОТКРЫТИЕ МОДАЛКИ ===
             function openBulkEditModal() {
                 const count = selectedBlocks.size;
                 const pixels = count * BLOCK_PIXELS;
@@ -1195,7 +1190,6 @@
             function closeEditModal() {
                 editModal.classList.remove('active');
                 imageFileInput.value = '';
-                pendingBlocks = [];
             }
 
             agreeCheckbox.addEventListener('change', function() {
@@ -1207,104 +1201,212 @@
                 if (e.target === editModal) closeEditModal();
             });
 
-            // ===== ПОКУПКА =====
-            buyBtn.addEventListener('click', function() {
+            // ===== ПОКУПКА С СЕРВЕРОМ =====
+            buyBtn.addEventListener('click', async function() {
                 if (!agreeCheckbox.checked) {
                     alert('⚠️ Примите условия оферты.');
                     return;
                 }
 
                 const blocks = [...selectedBlocks];
-                if (blocks.length === 0) return;
+                if (blocks.length === 0) {
+                    alert('⚠️ Не выбрано ни одного блока.');
+                    return;
+                }
 
                 const color = colorInput.value.trim() || '#2a4a7a';
                 const image = imageUrlInput.value.trim() || '';
                 const link = linkInput.value.trim() || '#';
                 const slogan = sloganInput.value.trim() || 'Без описания';
+                const totalPrice = blocks.length * BLOCK_PIXELS * PRICE_PER_PIXEL;
 
-                const price = blocks.length * BLOCK_PIXELS * PRICE_PER_PIXEL;
+                buyBtn.disabled = true;
+                buyBtn.textContent = '⏳ Создание платежа...';
 
-                pendingBlocks = blocks.map(id => {
-                    const [row, col] = id.split('_').map(Number);
-                    return { row, col, color, image, link, slogan };
-                });
+                try {
+                    const response = await fetch(`${API_URL}/api/create-payment`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            blocks: blocks,
+                            color: color,
+                            image: image,
+                            link: link,
+                            slogan: slogan,
+                            totalPrice: totalPrice
+                        })
+                    });
 
-                const returnUrl = window.location.href.split('?')[0] + '?payment=success&blocks=' + blocks.join(',');
-                const daUrl = DA_URL +
-                    '?amount=' + encodeURIComponent(price) +
-                    '&currency=RUB' +
-                    '&message=' + encodeURIComponent('Оплата ' + blocks.length + ' блоков') +
-                    '&return_url=' + encodeURIComponent(returnUrl);
+                    const data = await response.json();
 
-                const daWindow = window.open(daUrl, '_blank');
+                    if (!data.success) {
+                        alert('❌ ' + (data.error || 'Ошибка при создании платежа'));
+                        buyBtn.disabled = false;
+                        buyBtn.textContent = '💰 Купить';
+                        return;
+                    }
 
-                if (!daWindow) {
-                    alert('⚠️ Разрешите всплывающие окна.');
-                    return;
+                    currentTransactionId = data.transactionId;
+                    closeEditModal();
+
+                    const daWindow = window.open(data.paymentUrl, '_blank', 'width=600,height=700');
+
+                    if (!daWindow) {
+                        alert('⚠️ Разрешите всплывающие окна или откройте ссылку вручную:\n' + data.paymentUrl);
+                        window.location.href = data.paymentUrl;
+                        return;
+                    }
+
+                    startTransactionCheck(data.transactionId);
+                    showNotification('💳 Оплата создана. Ожидайте подтверждения...', 'info');
+
+                } catch (error) {
+                    console.error('Payment error:', error);
+                    alert('❌ Ошибка при создании платежа. Попробуйте позже.');
+                    buyBtn.disabled = false;
+                    buyBtn.textContent = '💰 Купить';
                 }
-
-                closeEditModal();
-                checkBulkPayment(blocks);
             });
 
-            function checkBulkPayment(blocks) {
-                const urlParams = new URLSearchParams(window.location.search);
-                const paymentStatus = urlParams.get('payment');
-                const blocksParam = urlParams.get('blocks');
+            // ===== ПРОВЕРКА ТРАНЗАКЦИИ =====
+            function startTransactionCheck(transactionId) {
+                if (transactionCheckInterval) {
+                    clearInterval(transactionCheckInterval);
+                    transactionCheckInterval = null;
+                }
 
-                if (paymentStatus === 'success' && blocksParam) {
-                    const paidBlocks = blocksParam.split(',');
-                    const allMatch = blocks.every(id => paidBlocks.includes(id));
+                let attempts = 0;
+                const maxAttempts = 60;
 
-                    if (allMatch && pendingBlocks.length > 0) {
-                        pendingBlocks.forEach(data => {
-                            const id = getBlockId(data.row, data.col);
-                            soldData[id] = {
-                                color: data.color,
-                                image: data.image,
-                                link: data.link,
-                                slogan: data.slogan
-                            };
-                        });
-                        saveData();
-                        selectedBlocks.clear();
-                        pendingBlocks = [];
-                        loadBlockImages();
-                        render();
-                        window.history.replaceState({}, document.title, window.location.pathname);
-                        alert('✅ Оплата успешна! ' + blocks.length + ' блоков активированы.');
+                transactionCheckInterval = setInterval(async () => {
+                    attempts++;
+
+                    try {
+                        const response = await fetch(`${API_URL}/api/transaction/${transactionId}`);
+                        if (!response.ok) throw new Error('Ошибка получения статуса');
+
+                        const data = await response.json();
+                        console.log(`📊 Статус транзакции ${transactionId}: ${data.status}`);
+
+                        if (data.status === 'completed') {
+                            clearInterval(transactionCheckInterval);
+                            transactionCheckInterval = null;
+                            await loadPixelsFromServer();
+                            selectedBlocks.clear();
+                            render();
+                            showNotification('✅ Оплата успешна! Блоки активированы.', 'success');
+                            currentTransactionId = null;
+                            buyBtn.disabled = false;
+                            buyBtn.textContent = '💰 Купить';
+                        } else if (data.status === 'failed' || data.status === 'cancelled') {
+                            clearInterval(transactionCheckInterval);
+                            transactionCheckInterval = null;
+                            showNotification('❌ Платеж не был завершен. Попробуйте снова.', 'error');
+                            currentTransactionId = null;
+                            buyBtn.disabled = false;
+                            buyBtn.textContent = '💰 Купить';
+                        } else if (attempts >= maxAttempts) {
+                            clearInterval(transactionCheckInterval);
+                            transactionCheckInterval = null;
+                            showNotification('⏰ Время ожидания истекло. Проверьте статус платежа вручную.', 'warning');
+                            currentTransactionId = null;
+                            buyBtn.disabled = false;
+                            buyBtn.textContent = '💰 Купить';
+                        }
+                    } catch (error) {
+                        console.error('Error checking transaction:', error);
+                        if (attempts >= maxAttempts) {
+                            clearInterval(transactionCheckInterval);
+                            transactionCheckInterval = null;
+                            currentTransactionId = null;
+                            buyBtn.disabled = false;
+                            buyBtn.textContent = '💰 Купить';
+                        }
                     }
+                }, 3000);
+            }
+
+            // ===== ЗАГРУЗКА С СЕРВЕРА =====
+            async function loadPixelsFromServer() {
+                try {
+                    const response = await fetch(`${API_URL}/api/pixels`);
+                    if (!response.ok) throw new Error('Ошибка загрузки данных');
+                    const data = await response.json();
+                    soldData = data;
+                    try {
+                        localStorage.setItem('pixelGridData', JSON.stringify(soldData));
+                    } catch (e) {}
+                    loadBlockImages();
+                    render();
+                } catch (error) {
+                    console.error('Error loading pixels from server:', error);
+                    loadData();
+                    render();
                 }
             }
 
-            function checkInitialPayment() {
+            // ===== ПРОВЕРКА ВОЗВРАТА =====
+            async function checkPaymentReturn() {
                 const urlParams = new URLSearchParams(window.location.search);
                 const paymentStatus = urlParams.get('payment');
-                const blocksParam = urlParams.get('blocks');
+                const transactionId = urlParams.get('transaction');
 
-                if (paymentStatus === 'success' && blocksParam && pendingBlocks.length > 0) {
-                    const paidBlocks = blocksParam.split(',');
-                    const allMatch = pendingBlocks.every(data => paidBlocks.includes(getBlockId(data.row, data.col)));
-
-                    if (allMatch) {
-                        pendingBlocks.forEach(data => {
-                            const id = getBlockId(data.row, data.col);
-                            soldData[id] = {
-                                color: data.color,
-                                image: data.image,
-                                link: data.link,
-                                slogan: data.slogan
-                            };
-                        });
-                        saveData();
-                        selectedBlocks.clear();
-                        pendingBlocks = [];
-                        loadBlockImages();
-                        render();
-                        alert('✅ Оплата подтверждена! Все блоки активированы.');
-                    }
+                if (paymentStatus === 'success' && transactionId) {
+                    await loadPixelsFromServer();
                     window.history.replaceState({}, document.title, window.location.pathname);
+                    showNotification('✅ Оплата подтверждена! Блоки активированы.', 'success');
+                } else if (paymentStatus === 'failed' && transactionId) {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    showNotification('❌ Платеж не был завершен. Попробуйте снова.', 'error');
+                } else if (paymentStatus === 'already_completed' && transactionId) {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    showNotification('✅ Блоки уже активированы!', 'success');
                 }
+            }
+
+            // ===== УВЕДОМЛЕНИЯ =====
+            function showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    padding: 16px 24px;
+                    border-radius: 12px;
+                    font-weight: 600;
+                    font-size: 15px;
+                    z-index: 10000;
+                    max-width: 90%;
+                    text-align: center;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                    animation: slideDown 0.3s ease-out;
+                    transition: opacity 0.5s;
+                `;
+
+                const colors = {
+                    success: 'linear-gradient(135deg, #1a5a2a, #0a3a1a)',
+                    error: 'linear-gradient(135deg, #5a1a1a, #3a0a0a)',
+                    warning: 'linear-gradient(135deg, #5a4a1a, #3a2a0a)',
+                    info: 'linear-gradient(135deg, #1a2a5a, #0a1a3a)'
+                };
+
+                notification.style.background = colors[type] || colors.info;
+                notification.style.border = '1px solid #4a6a8a';
+                notification.style.color = '#fff';
+                notification.textContent = message;
+                document.body.appendChild(notification);
+
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 500);
+                }, 5000);
             }
 
             // ===== ИНФО =====
@@ -1400,17 +1502,29 @@
             });
 
             // ===== ЗАПУСК =====
-            loadData();
-            resizeCanvas();
-
-            setTimeout(function() {
-                centerGrid();
+            async function init() {
+                loadData();
+                resizeCanvas();
+                await loadPixelsFromServer();
+                setTimeout(centerGrid, 50);
                 loadBlockImages();
-            }, 50);
+                await checkPaymentReturn();
 
-            checkInitialPayment();
+                const urlParams = new URLSearchParams(window.location.search);
+                const transactionId = urlParams.get('transaction');
+                if (transactionId) {
+                    startTransactionCheck(transactionId);
+                }
+            }
 
-            console.log('⚡ Pixel Map на Canvas. Производительность оптимизирована.');
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+
+            console.log('⚡ Pixel Map с серверной оплатой');
+            console.log('🌐 Сервер:', API_URL);
             console.log('📊 Продано блоков:', Object.keys(soldData).length);
 
         })();
